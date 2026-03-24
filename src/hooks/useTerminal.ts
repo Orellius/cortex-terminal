@@ -140,8 +140,10 @@ export function useTerminal(
       terminalRef.current = null;
       fitRef.current = null;
     };
+  // Re-run when cwd changes from empty (initial) to resolved home dir.
+  // Subsequent cwd changes (from Cmd+K) are handled by selectProject directly.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cwd]);
 
   return { termRef, terminalRef, searchRef, fitRef };
 }
