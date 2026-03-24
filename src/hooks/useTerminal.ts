@@ -32,10 +32,10 @@ export function useTerminal(
 
     const term = new Terminal({
       fontFamily: '"Geist Mono", Menlo, monospace',
-      fontSize: 13.5,
+      fontSize: 15,
       fontWeight: "400",
       fontWeightBold: "600",
-      letterSpacing: 0.3,
+      letterSpacing: 0.4,
       lineHeight: 1.4,
       cursorBlink: true,
       cursorStyle: "bar",
