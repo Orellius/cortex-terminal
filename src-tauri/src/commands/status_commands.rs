@@ -2,6 +2,7 @@ use serde::Serialize;
 use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
+use std::fs;
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ClaudeUsage {
@@ -169,4 +170,53 @@ pub(crate) fn get_claude_usage() -> Result<ClaudeUsage, String> {
     };
 
     Ok(fetch_usage(&token).unwrap_or_default())
+}
+
+// ---------------------------------------------------------------------------
+// Project launcher
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ProjectEntry {
+    pub name: String,
+    pub path: String,
+}
+
+/// Lists all immediate subdirectories of `~/Desktop/Orellius/Projects/`,
+/// sorted alphabetically by name. Returns an empty vec if the directory does
+/// not exist or cannot be read.
+#[tauri::command]
+pub(crate) async fn list_projects() -> Result<Vec<ProjectEntry>, String> {
+    let home = std::env::var("HOME").map_err(|e| format!("HOME not set: {e}"))?;
+    let projects_dir = Path::new(&home).join("Desktop/Orellius/Projects");
+
+    if !projects_dir.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let read_dir = match fs::read_dir(&projects_dir) {
+        Ok(rd) => rd,
+        Err(e) => return Err(format!("Failed to read projects directory: {e}")),
+    };
+
+    let mut entries: Vec<ProjectEntry> = read_dir
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let metadata = entry.metadata().ok()?;
+            if !metadata.is_dir() {
+                return None;
+            }
+            let name = entry.file_name().to_string_lossy().into_owned();
+            // Skip hidden directories (dotfiles).
+            if name.starts_with('.') {
+                return None;
+            }
+            let path = entry.path().to_string_lossy().into_owned();
+            Some(ProjectEntry { name, path })
+        })
+        .collect();
+
+    entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
+    Ok(entries)
 }

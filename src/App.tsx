@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  KeyboardEvent,
+} from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { listen } from "@tauri-apps/api/event";
@@ -20,9 +26,189 @@ interface ClaudeUsage {
   weekly_resets: string;
 }
 
+interface ProjectEntry {
+  name: string;
+  path: string;
+}
+
 const encoder = new TextEncoder();
 const TITLE_BAR_HEIGHT = "1.75rem";   // 28px
 const STATUS_BAR_HEIGHT = "1.75rem";  // 28px
+
+// ---------------------------------------------------------------------------
+// Project Launcher Modal
+// ---------------------------------------------------------------------------
+
+interface LauncherProps {
+  projects: ProjectEntry[];
+  onSelect: (project: ProjectEntry) => void;
+  onClose: () => void;
+}
+
+function ProjectLauncher({ projects, onSelect, onClose }: LauncherProps) {
+  const [query, setQuery] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const filtered = projects.filter((p) =>
+    p.name.toLowerCase().includes(query.toLowerCase())
+  );
+
+  // Clamp selectedIndex when the filtered list shrinks.
+  const clampedIndex =
+    filtered.length === 0 ? 0 : Math.min(selectedIndex, filtered.length - 1);
+
+  // Reset selection when query changes.
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query]);
+
+  // Autofocus input when modal mounts.
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  // Scroll selected item into view.
+  useEffect(() => {
+    if (!listRef.current) return;
+    const item = listRef.current.children[clampedIndex] as HTMLElement | undefined;
+    item?.scrollIntoView({ block: "nearest" });
+  }, [clampedIndex]);
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      onClose();
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex((prev) =>
+        filtered.length === 0 ? 0 : Math.min(prev + 1, filtered.length - 1)
+      );
+      return;
+    }
+
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIndex((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const project = filtered[clampedIndex];
+      if (project) onSelect(project);
+      return;
+    }
+  };
+
+  return (
+    // Backdrop
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0, 0, 0, 0.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 100,
+      }}
+    >
+      {/* Modal panel */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#1a1a1e",
+          border: "1px solid rgba(255, 255, 255, 0.06)",
+          borderRadius: "0.5rem",
+          width: "28rem",
+          maxHeight: "24rem",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {/* Search input */}
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Search projects..."
+          style={{
+            background: "transparent",
+            border: "none",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+            outline: "none",
+            width: "100%",
+            padding: "0.75rem",
+            fontFamily: '"Geist Mono", monospace',
+            fontSize: "0.875rem",
+            color: "#d4d4d8",
+            boxSizing: "border-box",
+          }}
+        />
+
+        {/* Results list */}
+        <div
+          ref={listRef}
+          style={{
+            overflowY: "auto",
+            flex: 1,
+          }}
+        >
+          {filtered.length === 0 ? (
+            <div
+              style={{
+                padding: "0.75rem",
+                fontFamily: '"Geist Mono", monospace',
+                fontSize: "0.8125rem",
+                color: "#52525b",
+              }}
+            >
+              No projects found
+            </div>
+          ) : (
+            filtered.map((project, idx) => {
+              const isActive = idx === clampedIndex;
+              return (
+                <div
+                  key={project.path}
+                  onClick={() => onSelect(project)}
+                  onMouseEnter={() => setSelectedIndex(idx)}
+                  style={{
+                    padding: "0.5rem 0.75rem",
+                    fontFamily: '"Geist Mono", monospace',
+                    fontSize: "0.8125rem",
+                    color: isActive ? "#fafafa" : "#a1a1aa",
+                    background: isActive
+                      ? "rgba(5, 160, 239, 0.125)"
+                      : "transparent",
+                    cursor: "pointer",
+                    userSelect: "none",
+                    transition: "background 80ms ease, color 80ms ease",
+                  }}
+                >
+                  {project.name}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// App
+// ---------------------------------------------------------------------------
 
 export function App() {
   const termRef = useRef<HTMLDivElement>(null);
@@ -33,6 +219,14 @@ export function App() {
   const [usage, setUsage] = useState<ClaudeUsage>({
     session_pct: 0, weekly_pct: 0, session_resets: "—", weekly_resets: "—",
   });
+
+  // Launcher state
+  const [showLauncher, setShowLauncher] = useState(false);
+  const [projects, setProjects] = useState<ProjectEntry[]>([]);
+
+  // -------------------------------------------------------------------------
+  // Terminal setup
+  // -------------------------------------------------------------------------
 
   useEffect(() => {
     const el = termRef.current;
@@ -174,7 +368,10 @@ export function App() {
     };
   }, []);
 
-  // Poll status data every 10s
+  // -------------------------------------------------------------------------
+  // Status polling
+  // -------------------------------------------------------------------------
+
   const pollStatus = useCallback(async () => {
     try {
       const b = await invoke<string>("get_git_branch", { cwd: "/Users/orelohayon" });
@@ -192,6 +389,66 @@ export function App() {
     return () => clearInterval(id);
   }, [pollStatus]);
 
+  // -------------------------------------------------------------------------
+  // Cmd+K launcher
+  // -------------------------------------------------------------------------
+
+  const openLauncher = useCallback(async () => {
+    try {
+      const result = await invoke<ProjectEntry[]>("list_projects");
+      setProjects(result);
+    } catch {
+      setProjects([]);
+    }
+    setShowLauncher(true);
+  }, []);
+
+  const closeLauncher = useCallback(() => {
+    setShowLauncher(false);
+  }, []);
+
+  const selectProject = useCallback(async (project: ProjectEntry) => {
+    setShowLauncher(false);
+    setCwd(project.path);
+
+    // Kill existing PTY and spawn a new one in the selected directory.
+    await invoke("kill_pty", { paneId: "main" }).catch(() => {});
+    try {
+      await invoke("spawn_pty", { paneId: "main", cwd: project.path });
+      // Clear the terminal and print a separator so the user knows context changed.
+      terminalRef.current?.clear();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      terminalRef.current?.write(`\x1b[31mpty error: ${msg}\x1b[0m\r\n`);
+    }
+
+    // Return focus to the terminal after navigation.
+    requestAnimationFrame(() => {
+      terminalRef.current?.focus();
+    });
+  }, []);
+
+  // Global Cmd+K listener
+  useEffect(() => {
+    const handler = (e: globalThis.KeyboardEvent) => {
+      if (e.metaKey && e.key === "k") {
+        e.preventDefault();
+        if (showLauncher) {
+          closeLauncher();
+        } else {
+          openLauncher();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [showLauncher, openLauncher, closeLauncher]);
+
+  // -------------------------------------------------------------------------
+  // Derived display values
+  // -------------------------------------------------------------------------
+
   const shortPath = cwd.replace("/Users/orelohayon", "~") || "~";
 
   const usageColor = (pct: number): string => {
@@ -199,6 +456,10 @@ export function App() {
     if (pct >= 50) return "#f59e0b";
     return "#52525b";
   };
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
 
   return (
     <div
@@ -289,6 +550,15 @@ export function App() {
         </span>
         <span style={{ color: "#3f3f46" }}>zsh</span>
       </div>
+
+      {/* Cmd+K project launcher */}
+      {showLauncher && (
+        <ProjectLauncher
+          projects={projects}
+          onSelect={selectProject}
+          onClose={closeLauncher}
+        />
+      )}
     </div>
   );
 }
