@@ -12,7 +12,17 @@
   font-display: swap;
 }
 
-html, body, #root {
+html {
+  /* Responsive base font: scales with viewport width.
+     On 2560px (2K): 16.8px base → 1rem = 16.8px
+     On 1920px (FHD): 15.2px base
+     On 1440px (laptop): 14px base
+     On 3840px (4K): 19.2px base
+     Clamped between 14px and 20px for safety. */
+  font-size: clamp(0.875rem, 0.5rem + 0.5vw, 1.25rem);
+}
+
+body, #root {
   height: 100%;
   width: 100%;
   margin: 0;

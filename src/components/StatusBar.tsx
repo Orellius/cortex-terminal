@@ -31,7 +31,7 @@ export function StatusBar({
         borderTop: "1px solid rgba(255, 255, 255, 0.04)",
         background: "#09090b",
         fontFamily: '"Geist Mono", Menlo, monospace',
-        fontSize: "0.8125rem",
+        fontSize: "0.75rem",
         color: "#3f3f46",
         userSelect: "none",
         fontVariantNumeric: "tabular-nums",

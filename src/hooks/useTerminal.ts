@@ -30,9 +30,14 @@ export function useTerminal(
     const el = termRef.current;
     if (!el) return;
 
+    // Derive terminal font size from the responsive root font-size (set via clamp() in CSS).
+    // This scales automatically across 2K, FHD, 4K displays.
+    const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const termFontSize = Math.round(rootFontSize * 0.95); // slightly smaller than UI text
+
     const term = new Terminal({
       fontFamily: '"Geist Mono", Menlo, monospace',
-      fontSize: 15,
+      fontSize: termFontSize,
       fontWeight: "400",
       fontWeightBold: "600",
       letterSpacing: 0.4,
