@@ -36,6 +36,11 @@ html, body, #root {
   height: 0 !important;
 }
 
+/* Make xterm background transparent so the logo watermark shows through */
+.xterm .xterm-scrollable-element {
+  background-color: transparent !important;
+}
+
 ::selection {
   background: rgba(5, 160, 239, 0.3);
   color: #fafafa;
