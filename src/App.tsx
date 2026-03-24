@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { listen } from "@tauri-apps/api/event";
@@ -13,6 +13,13 @@ interface PtyExitPayload {
   pane_id: string;
 }
 
+interface ClaudeUsage {
+  session_pct: number;
+  weekly_pct: number;
+  session_resets: string;
+  weekly_resets: string;
+}
+
 const encoder = new TextEncoder();
 const TITLE_BAR_HEIGHT = "1.75rem";   // 28px
 const STATUS_BAR_HEIGHT = "1.75rem";  // 28px
@@ -22,6 +29,10 @@ export function App() {
   const terminalRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const [cwd, setCwd] = useState("/Users/orelohayon");
+  const [branch, setBranch] = useState("—");
+  const [usage, setUsage] = useState<ClaudeUsage>({
+    session_pct: 0, weekly_pct: 0, session_resets: "—", weekly_resets: "—",
+  });
 
   useEffect(() => {
     const el = termRef.current;
@@ -163,8 +174,31 @@ export function App() {
     };
   }, []);
 
-  // Extract short path for display
+  // Poll status data every 10s
+  const pollStatus = useCallback(async () => {
+    try {
+      const b = await invoke<string>("get_git_branch", { cwd: "/Users/orelohayon" });
+      setBranch(b);
+    } catch { setBranch("—"); }
+    try {
+      const u = await invoke<ClaudeUsage>("get_claude_usage");
+      setUsage(u);
+    } catch { /* keep last known */ }
+  }, []);
+
+  useEffect(() => {
+    pollStatus();
+    const id = setInterval(pollStatus, 10_000);
+    return () => clearInterval(id);
+  }, [pollStatus]);
+
   const shortPath = cwd.replace("/Users/orelohayon", "~") || "~";
+
+  const usageColor = (pct: number): string => {
+    if (pct >= 80) return "#f43f5e";
+    if (pct >= 50) return "#f59e0b";
+    return "#52525b";
+  };
 
   return (
     <div
@@ -221,20 +255,39 @@ export function App() {
           minHeight: STATUS_BAR_HEIGHT,
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
+          gap: "1rem",
           padding: "0 0.75rem",
           borderTop: "1px solid rgba(255, 255, 255, 0.04)",
           background: "#09090b",
           fontFamily: '"Geist Mono", monospace',
           fontSize: "0.6875rem",
-          color: "#52525b",
+          color: "#3f3f46",
           userSelect: "none",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
-        <span>cortex</span>
-        <span style={{ fontVariantNumeric: "tabular-nums" }}>
-          zsh
+        {/* Left: branch */}
+        <span style={{ color: "#52525b" }}>
+          {branch !== "—" ? `${branch}` : ""}
         </span>
+
+        {/* Spacer */}
+        <span style={{ flex: 1 }} />
+
+        {/* Right: usage */}
+        <span>
+          session{" "}
+          <span style={{ color: usageColor(usage.session_pct) }}>
+            {Math.round(usage.session_pct)}%
+          </span>
+        </span>
+        <span>
+          weekly{" "}
+          <span style={{ color: usageColor(usage.weekly_pct) }}>
+            {Math.round(usage.weekly_pct)}%
+          </span>
+        </span>
+        <span style={{ color: "#3f3f46" }}>zsh</span>
       </div>
     </div>
   );

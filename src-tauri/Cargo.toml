@@ -24,3 +24,4 @@ anyhow = "1.0"
 thiserror = "2"
 portable-pty = "0.8"
 tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["blocking", "json"] }
