@@ -5,7 +5,7 @@ mod types;
 use std::sync::{Arc, Mutex};
 
 use commands::pty_commands::{kill_pty, resize_pty, spawn_pty, write_pty, PtyState};
-use commands::status_commands::{get_claude_usage, get_git_branch, list_projects};
+use commands::status_commands::{get_claude_usage, get_git_branch, get_home_dir, list_projects};
 use pty::PtyManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -26,7 +26,7 @@ pub fn run() {
         .manage(pty_state)
         .invoke_handler(tauri::generate_handler![
             spawn_pty, write_pty, resize_pty, kill_pty,
-            get_git_branch, get_claude_usage, list_projects,
+            get_git_branch, get_claude_usage, get_home_dir, list_projects,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

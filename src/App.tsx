@@ -8,6 +8,8 @@ import {
 import { Terminal } from "@xterm/xterm";
 import cortexLogo from "./assets/cortex-logo.png";
 import { FitAddon } from "@xterm/addon-fit";
+import { SearchAddon } from "@xterm/addon-search";
+import { SearchBar } from "./components/SearchBar";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -33,8 +35,8 @@ interface ProjectEntry {
 }
 
 const encoder = new TextEncoder();
-const TITLE_BAR_HEIGHT = "1.75rem";   // 28px
-const STATUS_BAR_HEIGHT = "1.75rem";  // 28px
+const TITLE_BAR_HEIGHT = "1.75rem";
+const STATUS_BAR_HEIGHT = "1.75rem";
 
 // ---------------------------------------------------------------------------
 // Project Launcher Modal
@@ -215,7 +217,10 @@ export function App() {
   const termRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
-  const [cwd, setCwd] = useState("/Users/orelohayon");
+  const searchRef = useRef<SearchAddon | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [homeDir, setHomeDir] = useState("");
+  const [cwd, setCwd] = useState("");
   const [branch, setBranch] = useState("—");
   const [usage, setUsage] = useState<ClaudeUsage>({
     session_pct: 0, weekly_pct: 0, session_resets: "—", weekly_resets: "—",
@@ -226,10 +231,28 @@ export function App() {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
 
   // -------------------------------------------------------------------------
-  // Terminal setup
+  // Resolve home directory on mount
   // -------------------------------------------------------------------------
 
   useEffect(() => {
+    invoke<string>("get_home_dir")
+      .then((dir) => {
+        setHomeDir(dir);
+        if (!cwd) setCwd(dir);
+      })
+      .catch(() => {
+        setHomeDir("/");
+        if (!cwd) setCwd("/");
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // -------------------------------------------------------------------------
+  // Terminal setup (waits for homeDir to resolve)
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!cwd) return; // wait for home dir
     const el = termRef.current;
     if (!el) return;
 
@@ -274,7 +297,9 @@ export function App() {
     });
 
     const fit = new FitAddon();
+    const search = new SearchAddon();
     term.loadAddon(fit);
+    term.loadAddon(search);
     term.open(el);
 
     requestAnimationFrame(() => {
@@ -284,6 +309,7 @@ export function App() {
 
     terminalRef.current = term;
     fitRef.current = fit;
+    searchRef.current = search;
 
     // Keystroke forwarding
     const dataDisposable = term.onData((data) => {
@@ -328,7 +354,7 @@ export function App() {
 
       await invoke("kill_pty", { paneId: "main" }).catch(() => {});
       try {
-        await invoke("spawn_pty", { paneId: "main", cwd: "/Users/orelohayon" });
+        await invoke("spawn_pty", { paneId: "main", cwd });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         term.write(`\x1b[31mpty error: ${msg}\x1b[0m\r\n`);
@@ -429,28 +455,37 @@ export function App() {
     });
   }, []);
 
-  // Global Cmd+K listener
+  // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: globalThis.KeyboardEvent) => {
-      if (e.metaKey && e.key === "k") {
+      if (!e.metaKey) return;
+
+      if (e.key === "k") {
         e.preventDefault();
-        if (showLauncher) {
-          closeLauncher();
-        } else {
-          openLauncher();
+        showLauncher ? closeLauncher() : openLauncher();
+        return;
+      }
+
+      if (e.key === "f") {
+        e.preventDefault();
+        setShowSearch((prev) => !prev);
+        if (showSearch) {
+          searchRef.current?.clearDecorations();
+          terminalRef.current?.focus();
         }
+        return;
       }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [showLauncher, openLauncher, closeLauncher]);
+  }, [showLauncher, showSearch, openLauncher, closeLauncher]);
 
   // -------------------------------------------------------------------------
   // Derived display values
   // -------------------------------------------------------------------------
 
-  const shortPath = cwd.replace("/Users/orelohayon", "~") || "~";
+  const shortPath = homeDir ? cwd.replace(homeDir, "~") : cwd || "~";
 
   const usageColor = (pct: number): string => {
     if (pct >= 80) return "#f43f5e";
@@ -526,6 +561,17 @@ export function App() {
             zIndex: 0,
           }}
         />
+        {/* Search bar */}
+        {showSearch && (
+          <SearchBar
+            searchAddon={searchRef.current}
+            onClose={() => {
+              setShowSearch(false);
+              searchRef.current?.clearDecorations();
+              terminalRef.current?.focus();
+            }}
+          />
+        )}
         {/* Terminal layer */}
         <div
           ref={termRef}

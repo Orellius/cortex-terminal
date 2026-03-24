@@ -58,6 +58,12 @@ pub(crate) fn get_git_branch(cwd: String) -> Result<String, String> {
     Ok(branch)
 }
 
+/// Returns the user's home directory path.
+#[tauri::command]
+pub(crate) async fn get_home_dir() -> Result<String, String> {
+    std::env::var("HOME").map_err(|e| format!("HOME not set: {e}"))
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers for get_claude_usage
 // ---------------------------------------------------------------------------
