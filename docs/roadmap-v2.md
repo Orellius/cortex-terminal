@@ -25,6 +25,7 @@
 
 ### Phase B.5: Content Panels
 6. **Markdown reader sidebar** — when user opens/cats a `.md` file, or triggers via Cmd+M, a right-side panel slides open showing the rendered markdown with rich text (headings, code blocks, lists, links, tables). Only available in single-pane or 2x2 grid layouts (not in 3+ col splits — no space). Sidebar is resizable, dismissible with Escape. Uses a React markdown renderer (react-markdown + rehype). Rust detects `.md` file access in CWD or parses `cat *.md` output to auto-suggest opening the reader.
+7. **Clickable file paths in terminal** — `.md` files (and other recognized file types) appearing in terminal output (from `ls`, `find`, `git status`, etc.) are clickable. Cmd+click on a `.md` path opens it in the markdown reader sidebar. Cmd+click on other files opens in default editor. Uses xterm's link provider API to detect file paths via regex, verified against filesystem existence in Rust before activating the link.
 
 ### Phase C: AI Integration (Local-First)
 7. **Shell integration hooks** — inject precmd/preexec hooks into zsh to detect command start/end, exit codes. This enables command blocks and error detection.
