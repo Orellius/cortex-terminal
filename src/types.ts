@@ -1,3 +1,9 @@
+export interface Tab {
+  id: string;
+  title: string;
+  cwd: string;
+}
+
 export interface PtyOutputPayload {
   pane_id: string;
   data: number[];

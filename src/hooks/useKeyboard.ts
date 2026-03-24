@@ -10,6 +10,9 @@ interface KeyboardCallbacks {
   showSearch: boolean;
   searchRef: React.RefObject<SearchAddon | null>;
   terminalRef: React.RefObject<Terminal | null>;
+  addTab: () => void;
+  closeTab: () => void;
+  switchTabByIndex: (index: number) => void;
 }
 
 export function useKeyboard({
@@ -20,6 +23,9 @@ export function useKeyboard({
   showSearch,
   searchRef,
   terminalRef,
+  addTab,
+  closeTab,
+  switchTabByIndex,
 }: KeyboardCallbacks): void {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -40,6 +46,25 @@ export function useKeyboard({
         }
         return;
       }
+
+      if (e.key === "t") {
+        e.preventDefault();
+        addTab();
+        return;
+      }
+
+      if (e.key === "w") {
+        e.preventDefault();
+        closeTab();
+        return;
+      }
+
+      const digit = parseInt(e.key, 10);
+      if (!isNaN(digit) && digit >= 1 && digit <= 9) {
+        e.preventDefault();
+        switchTabByIndex(digit - 1);
+        return;
+      }
     };
 
     window.addEventListener("keydown", handler);
@@ -52,5 +77,8 @@ export function useKeyboard({
     toggleSearch,
     searchRef,
     terminalRef,
+    addTab,
+    closeTab,
+    switchTabByIndex,
   ]);
 }

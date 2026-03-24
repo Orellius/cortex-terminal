@@ -18,22 +18,38 @@ interface TerminalRefs {
 
 export function useTerminal(
   cwd: string,
-  setCwd: (cwd: string) => void
+  setCwd: (cwd: string) => void,
+  paneId: string,
+  isActive: boolean
 ): TerminalRefs {
   const termRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
 
+  // Focus/blur the terminal when active state changes (after mount)
+  useEffect(() => {
+    if (!terminalRef.current) return;
+    if (isActive) {
+      requestAnimationFrame(() => {
+        terminalRef.current?.focus();
+      });
+    } else {
+      terminalRef.current.blur();
+    }
+  }, [isActive]);
+
   useEffect(() => {
     if (!cwd) return; // wait for home dir to resolve
+    if (!paneId) return;
     const el = termRef.current;
     if (!el) return;
 
     // Derive terminal font size from the responsive root font-size (set via clamp() in CSS).
-    // This scales automatically across 2K, FHD, 4K displays.
-    const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
-    const termFontSize = Math.round(rootFontSize * 0.95); // slightly smaller than UI text
+    const rootFontSize = parseFloat(
+      getComputedStyle(document.documentElement).fontSize
+    );
+    const termFontSize = Math.round(rootFontSize * 0.95);
 
     const term = new Terminal({
       fontFamily: '"Geist Mono", Menlo, monospace',
@@ -61,7 +77,9 @@ export function useTerminal(
 
     requestAnimationFrame(() => {
       fit.fit();
-      term.focus();
+      if (isActive) {
+        term.focus();
+      }
     });
 
     terminalRef.current = term;
@@ -71,7 +89,7 @@ export function useTerminal(
     // Keystroke forwarding
     const dataDisposable = term.onData((data) => {
       invoke("write_pty", {
-        paneId: "main",
+        paneId,
         data: Array.from(encoder.encode(data)),
       }).catch(() => {});
     });
@@ -90,25 +108,34 @@ export function useTerminal(
       if (disposed) return;
 
       unlistenOutput = await listen<PtyOutputPayload>(
-        "pty:output:main",
+        `pty:output:${paneId}`,
         (e) => {
           const t = terminalRef.current;
           if (!t) return;
           t.write(new Uint8Array(e.payload.data));
         }
       );
-      if (disposed) { unlistenOutput(); return; }
+      if (disposed) {
+        unlistenOutput();
+        return;
+      }
 
-      unlistenExit = await listen<PtyExitPayload>("pty:exit:main", () => {
-        terminalRef.current?.write(
-          "\r\n\x1b[38;5;241m[process exited]\x1b[0m\r\n"
-        );
-      });
-      if (disposed) { unlistenExit(); return; }
+      unlistenExit = await listen<PtyExitPayload>(
+        `pty:exit:${paneId}`,
+        () => {
+          terminalRef.current?.write(
+            "\r\n\x1b[38;5;241m[process exited]\x1b[0m\r\n"
+          );
+        }
+      );
+      if (disposed) {
+        unlistenExit();
+        return;
+      }
 
-      await invoke("kill_pty", { paneId: "main" }).catch(() => {});
+      await invoke("kill_pty", { paneId }).catch(() => {});
       try {
-        await invoke("spawn_pty", { paneId: "main", cwd });
+        await invoke("spawn_pty", { paneId, cwd });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         term.write(`\x1b[31mpty error: ${msg}\x1b[0m\r\n`);
@@ -124,7 +151,7 @@ export function useTerminal(
         try {
           f.fit();
           invoke("resize_pty", {
-            paneId: "main",
+            paneId,
             cols: t.cols,
             rows: t.rows,
           }).catch(() => {});
@@ -142,15 +169,15 @@ export function useTerminal(
       titleDisposable.dispose();
       unlistenOutput?.();
       unlistenExit?.();
-      invoke("kill_pty", { paneId: "main" }).catch(() => {});
+      invoke("kill_pty", { paneId }).catch(() => {});
       term.dispose();
       terminalRef.current = null;
       fitRef.current = null;
     };
-  // Re-run when cwd changes from empty (initial) to resolved home dir.
-  // Subsequent cwd changes (from Cmd+K) are handled by selectProject directly.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cwd]);
+    // Re-run when cwd changes from empty (initial) to resolved home dir.
+    // Subsequent cwd changes (from Cmd+K) are handled by selectProject directly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cwd, paneId]);
 
   return { termRef, terminalRef, searchRef, fitRef };
 }
