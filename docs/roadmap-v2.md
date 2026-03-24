@@ -23,6 +23,9 @@
 5. **LLM configuration** — add/remove model providers: Ollama (local), OpenAI, Anthropic, custom endpoints. Store in `~/.cortex/config.toml`
 6. **Persist settings** — Rust reads/writes `~/.cortex/config.toml`, React reads on boot
 
+### Phase B.5: Content Panels
+6. **Markdown reader sidebar** — when user opens/cats a `.md` file, or triggers via Cmd+M, a right-side panel slides open showing the rendered markdown with rich text (headings, code blocks, lists, links, tables). Only available in single-pane or 2x2 grid layouts (not in 3+ col splits — no space). Sidebar is resizable, dismissible with Escape. Uses a React markdown renderer (react-markdown + rehype). Rust detects `.md` file access in CWD or parses `cat *.md` output to auto-suggest opening the reader.
+
 ### Phase C: AI Integration (Local-First)
 7. **Shell integration hooks** — inject precmd/preexec hooks into zsh to detect command start/end, exit codes. This enables command blocks and error detection.
 8. **Command blocks** — group each command + output into a discrete visual block. Collapsible, copyable, referenceable.
