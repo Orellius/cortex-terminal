@@ -21,10 +21,10 @@ export function TitleBar({ shortPath }: TitleBarProps): JSX.Element {
     >
       <span
         style={{
-          fontFamily: '"Geist Mono", monospace',
-          fontSize: "0.6875rem",
+          fontFamily: '"Geist Mono", Menlo, monospace',
+          fontSize: "0.8125rem",
           color: "#71717a",
-          letterSpacing: "0.01em",
+          letterSpacing: "0.02em",
         }}
       >
         {shortPath}

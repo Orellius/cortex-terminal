@@ -30,8 +30,8 @@ export function StatusBar({
         padding: "0 0.75rem",
         borderTop: "1px solid rgba(255, 255, 255, 0.04)",
         background: "#09090b",
-        fontFamily: '"Geist Mono", monospace',
-        fontSize: "0.6875rem",
+        fontFamily: '"Geist Mono", Menlo, monospace',
+        fontSize: "0.75rem",
         color: "#3f3f46",
         userSelect: "none",
         fontVariantNumeric: "tabular-nums",
@@ -53,7 +53,7 @@ export function StatusBar({
           borderRadius: "0.25rem",
           border: "1px solid rgba(255, 255, 255, 0.06)",
           color: "#52525b",
-          fontSize: "0.625rem",
+          fontSize: "0.6875rem",
           cursor: "pointer",
           transition: "border-color 120ms ease, color 120ms ease",
           lineHeight: 1,
@@ -67,7 +67,7 @@ export function StatusBar({
           e.currentTarget.style.color = "#52525b";
         }}
       >
-        <span style={{ fontSize: "0.5625rem" }}>&#8984;</span>K
+        <span style={{ fontSize: "0.625rem" }}>&#8984;</span>K
       </span>
 
       {/* Spacer */}
