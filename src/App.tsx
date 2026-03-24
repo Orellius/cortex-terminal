@@ -6,6 +6,7 @@ import {
   KeyboardEvent,
 } from "react";
 import { Terminal } from "@xterm/xterm";
+import cortexLogo from "./assets/cortex-logo.png";
 import { FitAddon } from "@xterm/addon-fit";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
@@ -374,14 +375,14 @@ export function App() {
 
   const pollStatus = useCallback(async () => {
     try {
-      const b = await invoke<string>("get_git_branch", { cwd: "/Users/orelohayon" });
+      const b = await invoke<string>("get_git_branch", { cwd });
       setBranch(b);
     } catch { setBranch("—"); }
     try {
       const u = await invoke<ClaudeUsage>("get_claude_usage");
       setUsage(u);
     } catch { /* keep last known */ }
-  }, []);
+  }, [cwd]);
 
   useEffect(() => {
     pollStatus();
@@ -497,17 +498,47 @@ export function App() {
         </span>
       </div>
 
-      {/* Terminal */}
+      {/* Terminal + logo watermark */}
       <div
-        ref={termRef}
-        onClick={() => terminalRef.current?.focus()}
         style={{
           flex: 1,
           minHeight: 0,
+          position: "relative",
           overflow: "hidden",
-          padding: "0 0.5rem",
         }}
-      />
+      >
+        {/* Centered logo watermark — behind terminal content */}
+        <img
+          src={cortexLogo}
+          alt=""
+          draggable={false}
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: "min(12vw, 8rem)",
+            height: "auto",
+            opacity: 0.03,
+            pointerEvents: "none",
+            userSelect: "none",
+            zIndex: 0,
+          }}
+        />
+        {/* Terminal layer */}
+        <div
+          ref={termRef}
+          onClick={() => terminalRef.current?.focus()}
+          style={{
+            position: "relative",
+            width: "100%",
+            height: "100%",
+            overflow: "hidden",
+            padding: "0 0.5rem",
+            zIndex: 1,
+          }}
+        />
+      </div>
 
       {/* Status bar */}
       <div
