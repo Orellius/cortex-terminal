@@ -532,6 +532,34 @@ export function App() {
           {branch !== "—" ? `${branch}` : ""}
         </span>
 
+        {/* Cmd+K hint */}
+        <span
+          onClick={openLauncher}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.25rem",
+            padding: "0.125rem 0.375rem",
+            borderRadius: "0.25rem",
+            border: "1px solid rgba(255, 255, 255, 0.06)",
+            color: "#52525b",
+            fontSize: "0.625rem",
+            cursor: "pointer",
+            transition: "border-color 120ms ease, color 120ms ease",
+            lineHeight: 1,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)";
+            e.currentTarget.style.color = "#71717a";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.06)";
+            e.currentTarget.style.color = "#52525b";
+          }}
+        >
+          <span style={{ fontSize: "0.5625rem" }}>&#8984;</span>K
+        </span>
+
         {/* Spacer */}
         <span style={{ flex: 1 }} />
 
