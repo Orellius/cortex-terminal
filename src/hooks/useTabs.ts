@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { Tab } from "../types";
 
 interface UseTabsResult {
@@ -20,10 +20,18 @@ function makeTab(cwd: string): Tab {
 }
 
 export function useTabs(homeDir: string): UseTabsResult {
-  const [tabs, setTabs] = useState<Tab[]>(() => [makeTab(homeDir || "")]);
-  const [activeTabId, setActiveTabId] = useState<string>(
-    () => tabs[0]?.id ?? ""
-  );
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string>("");
+  const initialized = useRef(false);
+
+  // Create first tab only after homeDir resolves
+  useEffect(() => {
+    if (!homeDir || initialized.current) return;
+    initialized.current = true;
+    const first = makeTab(homeDir);
+    setTabs([first]);
+    setActiveTabId(first.id);
+  }, [homeDir]);
 
   const addTab = useCallback(
     (cwd?: string) => {
