@@ -186,22 +186,23 @@ export function App() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
           userSelect: "none",
         }}
       >
         <span
           style={{
-            fontFamily: '"Geist Sans", system-ui, sans-serif',
-            fontSize: 12,
-            color: "#52525b",
-            letterSpacing: "0.02em",
+            fontFamily: '"Geist Mono", monospace',
+            fontSize: 11,
+            color: "#71717a",
+            letterSpacing: "0.01em",
           }}
         >
           {shortPath}
         </span>
       </div>
 
-      {/* Terminal — explicit pixel height, not flex */}
+      {/* Terminal */}
       <div
         ref={termRef}
         onClick={() => terminalRef.current?.focus()}
@@ -209,7 +210,7 @@ export function App() {
           flex: 1,
           minHeight: 0,
           overflow: "hidden",
-          padding: "0 6px",
+          padding: "4px 8px 0 8px",
         }}
       />
 
@@ -223,10 +224,10 @@ export function App() {
           justifyContent: "space-between",
           padding: "0 12px",
           borderTop: "1px solid rgba(255, 255, 255, 0.04)",
-          background: "#0f0f12",
+          background: "#09090b",
           fontFamily: '"Geist Mono", monospace',
           fontSize: 11,
-          color: "#3f3f46",
+          color: "#52525b",
           userSelect: "none",
         }}
       >
