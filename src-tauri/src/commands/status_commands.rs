@@ -188,9 +188,9 @@ pub(crate) struct ProjectEntry {
     pub path: String,
 }
 
-/// Lists all immediate subdirectories of `~/Desktop/Orellius/Projects/`,
-/// sorted alphabetically by name. Returns an empty vec if the directory does
-/// not exist or cannot be read.
+/// Lists all git repos under `~/Desktop/Orellius/Projects/`, scanning up to
+/// 2 levels deep (handles category folders like active/, mcp-servers/, etc.).
+/// Each entry shows `category/name` for nested repos. Sorted alphabetically.
 #[tauri::command]
 pub(crate) async fn list_projects() -> Result<Vec<ProjectEntry>, String> {
     let home = std::env::var("HOME").map_err(|e| format!("HOME not set: {e}"))?;
@@ -200,27 +200,60 @@ pub(crate) async fn list_projects() -> Result<Vec<ProjectEntry>, String> {
         return Ok(Vec::new());
     }
 
-    let read_dir = match fs::read_dir(&projects_dir) {
+    let mut entries: Vec<ProjectEntry> = Vec::new();
+
+    let top_dirs = match fs::read_dir(&projects_dir) {
         Ok(rd) => rd,
         Err(e) => return Err(format!("Failed to read projects directory: {e}")),
     };
 
-    let mut entries: Vec<ProjectEntry> = read_dir
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let metadata = entry.metadata().ok()?;
-            if !metadata.is_dir() {
-                return None;
+    for top_entry in top_dirs.flatten() {
+        let meta = match top_entry.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        if !meta.is_dir() {
+            continue;
+        }
+        let top_name = top_entry.file_name().to_string_lossy().into_owned();
+        if top_name.starts_with('.') {
+            continue;
+        }
+
+        let top_path = top_entry.path();
+
+        // If this directory is itself a git repo, add it directly
+        if top_path.join(".git").is_dir() {
+            entries.push(ProjectEntry {
+                name: top_name,
+                path: top_path.to_string_lossy().into_owned(),
+            });
+            continue;
+        }
+
+        // Otherwise scan one level deeper (category folder)
+        if let Ok(sub_dirs) = fs::read_dir(&top_path) {
+            for sub_entry in sub_dirs.flatten() {
+                let sub_meta = match sub_entry.metadata() {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
+                if !sub_meta.is_dir() {
+                    continue;
+                }
+                let sub_name = sub_entry.file_name().to_string_lossy().into_owned();
+                if sub_name.starts_with('.') {
+                    continue;
+                }
+                let display = format!("{top_name}/{sub_name}");
+                let sub_path = sub_entry.path().to_string_lossy().into_owned();
+                entries.push(ProjectEntry {
+                    name: display,
+                    path: sub_path,
+                });
             }
-            let name = entry.file_name().to_string_lossy().into_owned();
-            // Skip hidden directories (dotfiles).
-            if name.starts_with('.') {
-                return None;
-            }
-            let path = entry.path().to_string_lossy().into_owned();
-            Some(ProjectEntry { name, path })
-        })
-        .collect();
+        }
+    }
 
     entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
 
