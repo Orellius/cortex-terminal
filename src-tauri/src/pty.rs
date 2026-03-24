@@ -82,6 +82,8 @@ impl PtyManager {
         // Provide a sane minimal environment.
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
+        // Suppress zsh PROMPT_EOL_MARK (the trailing % on incomplete lines)
+        cmd.env("PROMPT_EOL_MARK", "");
         // Inherit PATH from the parent process so shell builtins resolve.
         if let Ok(path) = std::env::var("PATH") {
             cmd.env("PATH", path);

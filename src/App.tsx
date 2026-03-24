@@ -14,8 +14,8 @@ interface PtyExitPayload {
 }
 
 const encoder = new TextEncoder();
-const TITLE_BAR_HEIGHT = 28;
-const STATUS_BAR_HEIGHT = 28;
+const TITLE_BAR_HEIGHT = "1.75rem";   // 28px
+const STATUS_BAR_HEIGHT = "1.75rem";  // 28px
 
 export function App() {
   const termRef = useRef<HTMLDivElement>(null);
@@ -34,7 +34,7 @@ export function App() {
       lineHeight: 1.35,
       cursorBlink: true,
       cursorStyle: "bar",
-      cursorWidth: 2,
+      cursorWidth: 2, // xterm uses px internally — cannot use rem here
       cursorInactiveStyle: "outline",
       scrollback: 5000,
       allowProposedApi: true,
@@ -193,7 +193,7 @@ export function App() {
         <span
           style={{
             fontFamily: '"Geist Mono", monospace',
-            fontSize: 11,
+            fontSize: "0.6875rem",
             color: "#71717a",
             letterSpacing: "0.01em",
           }}
@@ -210,7 +210,7 @@ export function App() {
           flex: 1,
           minHeight: 0,
           overflow: "hidden",
-          padding: "0 8px",
+          padding: "0 0.5rem",
         }}
       />
 
@@ -222,11 +222,11 @@ export function App() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 12px",
+          padding: "0 0.75rem",
           borderTop: "1px solid rgba(255, 255, 255, 0.04)",
           background: "#09090b",
           fontFamily: '"Geist Mono", monospace',
-          fontSize: 11,
+          fontSize: "0.6875rem",
           color: "#52525b",
           userSelect: "none",
         }}
