@@ -13,13 +13,11 @@
 }
 
 html {
-  /* Responsive base font: scales with viewport width.
-     On 2560px (2K): 16.8px base → 1rem = 16.8px
-     On 1920px (FHD): 15.2px base
-     On 1440px (laptop): 14px base
-     On 3840px (4K): 19.2px base
-     Clamped between 14px and 20px for safety. */
-  font-size: clamp(0.875rem, 0.5rem + 0.5vw, 1.25rem);
+  /* Responsive root scaling — px-based to avoid rem self-reference on html.
+     Fluid between 14px (small) and 20px (large) based on viewport width.
+     1280px → 14px | 1920px → 16.4px | 2560px → 18.8px | 3840px → 22.6px (capped 20px)
+     Formula: 10px + 0.625vw, clamped [14px, 20px] */
+  font-size: clamp(14px, 10px + 0.625vw, 20px);
 }
 
 body, #root {
@@ -33,6 +31,7 @@ body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* xterm.js overrides for WKWebView */
 .xterm-helper-textarea {
   opacity: 0 !important;
 }
@@ -46,18 +45,13 @@ body, #root {
   height: 0 !important;
 }
 
-/* Make xterm background transparent so the logo watermark shows through */
 .xterm .xterm-scrollable-element {
   background-color: transparent !important;
 }
 
-::selection {
-  background: rgba(5, 160, 239, 0.3);
-  color: #fafafa;
-}
-
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
+  width: 0.3rem;
 }
 
 ::-webkit-scrollbar-track {
@@ -66,9 +60,14 @@ body, #root {
 
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
+  border-radius: 0.2rem;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.14);
+}
+
+::selection {
+  background: rgba(5, 160, 239, 0.3);
+  color: #fafafa;
 }
