@@ -32,12 +32,14 @@ export function useTerminal(
 
     const term = new Terminal({
       fontFamily: '"Geist Mono", Menlo, monospace',
-      fontSize: 13,
-      letterSpacing: 0,
-      lineHeight: 1.35,
+      fontSize: 13.5,
+      fontWeight: "400",
+      fontWeightBold: "600",
+      letterSpacing: 0.3,
+      lineHeight: 1.4,
       cursorBlink: true,
       cursorStyle: "bar",
-      cursorWidth: 2, // xterm uses px internally — cannot use rem here
+      cursorWidth: 2,
       cursorInactiveStyle: "outline",
       scrollback: 5000,
       allowProposedApi: true,

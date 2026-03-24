@@ -20,8 +20,9 @@
 
 ### Phase B: Settings & Configuration
 4. **Settings panel** — slide-out or modal: font size, theme, scrollback, keybindings
-5. **LLM configuration** — add/remove model providers: Ollama (local), OpenAI, Anthropic, custom endpoints. Store in `~/.cortex/config.toml`
+5. **LLM configuration** — add/remove model providers: Ollama (local), OpenAI, Anthropic, custom endpoints. Store in `~/.cortex/config.toml`. Auto-detect installed CLIs (ollama, claude, etc.) and connected API keys on first launch.
 6. **Persist settings** — Rust reads/writes `~/.cortex/config.toml`, React reads on boot
+7. **Contextual status bar** — status bar hidden by default. Appears when: AI is active/processing, user hovers bottom edge, or AI feature is invoked. Contains LLM dropdown picker (switch models mid-session), usage stats, git branch. When no AI connected, shows minimal "connect LLM" prompt instead of empty stats.
 
 ### Phase B.5: Content Panels
 6. **Markdown reader sidebar** — when user opens/cats a `.md` file, or triggers via Cmd+M, a right-side panel slides open showing the rendered markdown with rich text (headings, code blocks, lists, links, tables). Only available in single-pane or 2x2 grid layouts (not in 3+ col splits — no space). Sidebar is resizable, dismissible with Escape. Uses a React markdown renderer (react-markdown + rehype). Rust detects `.md` file access in CWD or parses `cat *.md` output to auto-suggest opening the reader.
