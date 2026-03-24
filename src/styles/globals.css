@@ -23,6 +23,10 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.xterm-helper-textarea {
+  opacity: 0 !important;
+}
+
 ::selection {
   background: rgba(5, 160, 239, 0.3);
   color: #fafafa;

@@ -14,7 +14,7 @@ interface PtyExitPayload {
 }
 
 const encoder = new TextEncoder();
-const TITLE_BAR_HEIGHT = 38;
+const TITLE_BAR_HEIGHT = 28;
 const STATUS_BAR_HEIGHT = 28;
 
 export function App() {
@@ -48,7 +48,7 @@ export function App() {
         selectionBackground: "rgba(5, 160, 239, 0.25)",
         selectionForeground: "#fafafa",
         selectionInactiveBackground: "rgba(255, 255, 255, 0.08)",
-        black: "#27272a",
+        black: "#3f3f46",
         red: "#f87171",
         green: "#4ade80",
         yellow: "#facc15",
@@ -210,7 +210,7 @@ export function App() {
           flex: 1,
           minHeight: 0,
           overflow: "hidden",
-          padding: "4px 8px 0 8px",
+          padding: "0 8px",
         }}
       />
 
