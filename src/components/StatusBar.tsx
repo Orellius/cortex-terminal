@@ -1,6 +1,20 @@
-import type { JSX } from "react";
+import { useState, useEffect, type JSX } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { ClaudeUsage } from "../types";
 import { STATUS_BAR_HEIGHT } from "../constants";
+
+interface ProviderStatus {
+  name: string;
+  kind: string;
+  available: boolean;
+  model: string;
+}
+
+interface BudgetStatus {
+  spent_today: number;
+  limit: number;
+  is_capped: boolean;
+}
 
 interface StatusBarProps {
   branch: string;
@@ -14,11 +28,39 @@ function usageColor(pct: number): string {
   return "#52525b";
 }
 
+const PROVIDER_COLORS: Record<string, string> = {
+  claude: "#8b5cf6",
+  gemini: "#0ea5e9",
+  ollama: "#10b981",
+};
+
+const PROVIDER_ICONS: Record<string, string> = {
+  claude: "◆",
+  gemini: "◈",
+  ollama: "●",
+};
+
 export function StatusBar({
   branch,
   usage,
   onOpenLauncher,
 }: StatusBarProps): JSX.Element {
+  const [providers, setProviders] = useState<ProviderStatus[]>([]);
+  const [budget, setBudget] = useState<BudgetStatus>({ spent_today: 0, limit: 5, is_capped: false });
+
+  useEffect(() => {
+    // Check providers on mount + every 30s
+    const check = () => {
+      invoke<ProviderStatus[]>("check_providers").then(setProviders).catch(() => {});
+      invoke<BudgetStatus>("get_budget_status").then(setBudget).catch(() => {});
+    };
+    check();
+    const interval = setInterval(check, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const costStr = budget.spent_today > 0 ? `$${budget.spent_today.toFixed(3)}` : "$0";
+
   return (
     <div
       style={{
@@ -26,12 +68,12 @@ export function StatusBar({
         minHeight: STATUS_BAR_HEIGHT,
         display: "flex",
         alignItems: "center",
-        gap: "1rem",
+        gap: "0.75rem",
         padding: "0 0.75rem",
-        borderTop: "1px solid rgba(255, 255, 255, 0.04)",
-        background: "#09090b",
+        borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+        background: "#010101",
         fontFamily: '"Geist Mono", Menlo, monospace',
-        fontSize: "0.75rem",
+        fontSize: "0.6875rem",
         color: "#3f3f46",
         userSelect: "none",
         fontVariantNumeric: "tabular-nums",
@@ -53,27 +95,46 @@ export function StatusBar({
           borderRadius: "0.25rem",
           border: "1px solid rgba(255, 255, 255, 0.06)",
           color: "#52525b",
-          fontSize: "0.75rem",
+          fontSize: "0.6875rem",
           cursor: "pointer",
-          transition: "border-color 120ms ease, color 120ms ease",
           lineHeight: 1,
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)";
-          e.currentTarget.style.color = "#71717a";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.06)";
-          e.currentTarget.style.color = "#52525b";
-        }}
       >
-        <span style={{ fontSize: "0.6875rem" }}>&#8984;</span>K
+        <span style={{ fontSize: "0.625rem" }}>&#8984;</span>K
       </span>
+
+      {/* Model status indicators */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        {providers.map((p) => (
+          <span
+            key={p.kind}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.25rem",
+              color: p.available
+                ? PROVIDER_COLORS[p.kind] ?? "#52525b"
+                : "#27272a",
+              opacity: p.available ? 1 : 0.4,
+            }}
+            title={`${p.name}: ${p.available ? p.model : "offline"}`}
+          >
+            {PROVIDER_ICONS[p.kind] ?? "○"}
+            <span style={{ fontSize: "0.625rem" }}>{p.name}</span>
+          </span>
+        ))}
+      </div>
 
       {/* Spacer */}
       <span style={{ flex: 1 }} />
 
-      {/* Right: usage */}
+      {/* Budget */}
+      <span style={{ color: budget.is_capped ? "#f43f5e" : "#3f3f46" }}>
+        {costStr}
+        {budget.is_capped && " LOCAL ONLY"}
+      </span>
+
+      {/* Usage */}
       <span>
         session{" "}
         <span style={{ color: usageColor(usage.session_pct) }}>
@@ -86,7 +147,7 @@ export function StatusBar({
           {Math.round(usage.weekly_pct)}%
         </span>
       </span>
-      <span style={{ color: "#3f3f46" }}>zsh</span>
+      <span style={{ color: "#27272a" }}>zsh</span>
     </div>
   );
 }

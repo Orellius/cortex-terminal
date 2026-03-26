@@ -1,3 +1,4 @@
+pub(crate) mod budget;
 pub(crate) mod config;
 pub(crate) mod database;
 pub(crate) mod providers;
