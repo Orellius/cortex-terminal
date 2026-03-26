@@ -20,13 +20,6 @@ const MODEL_DISPLAY: Record<string, string> = {
   "opus": "Claude Opus",
 };
 
-/** Provider type labels */
-const PROVIDER_TYPE: Record<string, string> = {
-  claude: "Cloud",
-  gemini: "Free",
-  ollama: "Local",
-};
-
 /** Provider icons (unicode) */
 const PROVIDER_ICON: Record<string, string> = {
   claude: "◆",
@@ -39,32 +32,16 @@ export function formatAiResponse(opts: FormatOptions): string {
   const color = PROVIDER_COLORS[opts.provider] ?? "\x1b[37m";
   const icon = PROVIDER_ICON[opts.provider] ?? "○";
   const displayName = MODEL_DISPLAY[opts.model] ?? opts.model;
-  const providerType = PROVIDER_TYPE[opts.provider] ?? "";
   const costStr = opts.cost > 0 ? `$${opts.cost.toFixed(4)}` : "$0";
   const duration = (opts.durationMs / 1000).toFixed(1);
-  const verifyTag = opts.verified ? "" : ` ${DIM}⚠ unverified${RESET}`;
 
   const cleaned = stripThinkTags(opts.content);
 
-  const lines: string[] = [];
+  // Compact format: model name > response (cost · time)
+  const response = cleaned.replace(/\n/g, " ").trim();
+  const meta = `${DIM}${costStr} · ${duration}s${RESET}`;
 
-  // Header: [icon] Model Name — Provider Type
-  lines.push("");
-  lines.push(`${color}${BOLD}${icon} ${displayName}${RESET} ${DIM}— ${providerType}${RESET}${verifyTag}`);
-  lines.push(`${DIM}${"─".repeat(60)}${RESET}`);
-
-  // Content
-  const contentLines = cleaned.trimEnd().split("\n");
-  for (const line of contentLines) {
-    lines.push(line);
-  }
-
-  // Footer: cost · duration
-  lines.push(`${DIM}${"─".repeat(60)}${RESET}`);
-  lines.push(`${DIM}${costStr} · ${duration}s${RESET}`);
-  lines.push("");
-
-  return lines.join("\r\n");
+  return `${color}${icon} ${displayName}${RESET} ${DIM}>${RESET} ${response} ${meta}\r\n`;
 }
 
 /** Strip ALL thinking/reasoning blocks from model output.
