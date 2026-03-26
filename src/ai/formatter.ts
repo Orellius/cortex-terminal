@@ -1,4 +1,4 @@
-import { PROVIDER_COLORS, PROVIDER_LABELS, RESET, BOLD, DIM } from "./constants";
+import { PROVIDER_COLORS, RESET, BOLD, DIM } from "./constants";
 
 interface FormatOptions {
   readonly provider: string;
@@ -9,58 +9,80 @@ interface FormatOptions {
   readonly verified: boolean;
 }
 
-/** Format an AI response for inline terminal display using ANSI escape codes. */
+/** Model display names with provider context */
+const MODEL_DISPLAY: Record<string, string> = {
+  "nemotron-cascade-2": "Nemotron Cascade 2",
+  "qwen2.5-coder:32b": "Qwen 2.5 Coder 32B",
+  "dolphin-llama3:8b": "Dolphin Llama3 8B",
+  "gemini-2.0-flash": "Gemini 2.0 Flash",
+  "sonnet": "Claude Sonnet",
+  "haiku": "Claude Haiku",
+  "opus": "Claude Opus",
+};
+
+/** Provider type labels */
+const PROVIDER_TYPE: Record<string, string> = {
+  claude: "Cloud",
+  gemini: "Free",
+  ollama: "Local",
+};
+
+/** Provider icons (unicode) */
+const PROVIDER_ICON: Record<string, string> = {
+  claude: "◆",
+  gemini: "◈",
+  ollama: "●",
+};
+
+/** Format an AI response for inline terminal display */
 export function formatAiResponse(opts: FormatOptions): string {
   const color = PROVIDER_COLORS[opts.provider] ?? "\x1b[37m";
-  const label = PROVIDER_LABELS[opts.provider] ?? opts.provider;
+  const icon = PROVIDER_ICON[opts.provider] ?? "○";
+  const displayName = MODEL_DISPLAY[opts.model] ?? opts.model;
+  const providerType = PROVIDER_TYPE[opts.provider] ?? "";
   const costStr = opts.cost > 0 ? `$${opts.cost.toFixed(4)}` : "$0";
   const duration = (opts.durationMs / 1000).toFixed(1);
-  const verifyBadge = opts.verified ? "" : ` ${DIM}[unverified]${RESET}`;
+  const verifyTag = opts.verified ? "" : ` ${DIM}⚠ unverified${RESET}`;
 
-  // Strip <think>...</think> blocks from model output
   const cleaned = stripThinkTags(opts.content);
 
   const lines: string[] = [];
 
-  // Header: provider badge
+  // Header: [icon] Model Name — Provider Type
   lines.push("");
-  lines.push(`${color}${BOLD} ${label} ${RESET} ${DIM}${opts.model}${RESET}${verifyBadge}`);
+  lines.push(`${color}${BOLD}${icon} ${displayName}${RESET} ${DIM}— ${providerType}${RESET}${verifyTag}`);
   lines.push(`${DIM}${"─".repeat(60)}${RESET}`);
 
-  // Content — cleaned of thinking tags
+  // Content
   const contentLines = cleaned.trimEnd().split("\n");
   for (const line of contentLines) {
     lines.push(line);
   }
 
-  // Footer: cost + duration
+  // Footer: cost · duration
   lines.push(`${DIM}${"─".repeat(60)}${RESET}`);
-  lines.push(`${DIM} ${costStr}  ${duration}s${RESET}`);
+  lines.push(`${DIM}${costStr} · ${duration}s${RESET}`);
   lines.push("");
 
   return lines.join("\r\n");
 }
 
-/** Strip <think>...</think> reasoning blocks from model output.
- *  Nemotron-Cascade-2 and similar models wrap reasoning in these tags. */
+/** Strip <think>...</think> reasoning blocks from model output */
 function stripThinkTags(content: string): string {
-  // Remove everything between <think> and </think> (including tags)
   let result = content.replace(/<think>[\s\S]*?<\/think>/gi, "");
-  // Also handle unclosed <think> (model still thinking at output end)
   result = result.replace(/<think>[\s\S]*/gi, "");
-  // Clean up extra leading newlines from removal
   result = result.replace(/^\n+/, "");
   return result.trim();
 }
 
-/** Format a "thinking" indicator */
+/** Format a "thinking" indicator with model name */
 export function formatThinking(provider: string): string {
   const color = PROVIDER_COLORS[provider] ?? "\x1b[37m";
-  const label = PROVIDER_LABELS[provider] ?? provider;
-  return `\r\n${color}${BOLD} ${label} ${RESET} ${DIM}thinking...${RESET}`;
+  const icon = PROVIDER_ICON[provider] ?? "○";
+  return `\r\n${color}${BOLD}${icon}${RESET} ${DIM}thinking...${RESET}`;
 }
 
 /** Format a budget cap warning */
 export function formatBudgetCap(): string {
-  return `\r\n\x1b[33m${BOLD} budget ${RESET} ${DIM}daily limit reached — local models only${RESET}\r\n`;
+  return `\r\n\x1b[33m${BOLD}⚠ budget${RESET} ${DIM}daily limit reached — local models only${RESET}\r\n`;
 }
