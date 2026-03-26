@@ -77,7 +77,7 @@ function stripThinkTags(content: string): string {
 export function formatThinking(provider: string): string {
   const color = PROVIDER_COLORS[provider] ?? "\x1b[37m";
   const icon = PROVIDER_ICON[provider] ?? "○";
-  return `\r\n${color}${BOLD}${icon}${RESET} ${DIM}thinking...${RESET}`;
+  return `${color}${BOLD}${icon}${RESET} ${DIM}thinking...${RESET}`;
 }
 
 /** Format a budget cap warning */
