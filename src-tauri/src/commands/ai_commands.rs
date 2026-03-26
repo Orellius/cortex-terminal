@@ -86,7 +86,7 @@ pub(crate) async fn send_ai_query(
     tokio::task::spawn_blocking(move || {
         let start = std::time::Instant::now();
 
-        let result = providers::execute(&query_owned, provider, &model, &config);
+        let result = providers::execute(&query_owned, provider, &model, &config, None);
         let duration_ms = start.elapsed().as_millis() as u64;
 
         let (content, cost, verified) = match result {

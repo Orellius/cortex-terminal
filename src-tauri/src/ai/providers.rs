@@ -3,29 +3,37 @@ use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result};
 
+use super::brain;
 use super::types::{CortexConfig, ProviderKind};
 
-/// Execute a query against the specified provider.
+/// Execute a query with the shared .cortex/ brain prepended.
 pub(crate) fn execute(
     query: &str,
     provider: ProviderKind,
     model: &str,
     config: &CortexConfig,
+    cwd: Option<&str>,
 ) -> Result<String> {
+    let system = brain::load_system_prompt();
+    let project_ctx = brain::load_project_context(cwd).unwrap_or_default();
+
+    let full_prompt = if project_ctx.is_empty() {
+        format!("{system}\n\n---\nUser query: {query}")
+    } else {
+        format!("{system}\n\n---\nProject context:\n{project_ctx}\n\n---\nUser query: {query}")
+    };
+
     match provider {
-        ProviderKind::Claude => execute_claude(query, model),
+        ProviderKind::Claude => execute_claude(&full_prompt, model),
         ProviderKind::Gemini => {
-            let key = config
-                .gemini_api_key
-                .as_deref()
+            let key = config.gemini_api_key.as_deref()
                 .ok_or_else(|| anyhow::anyhow!("Gemini API key not configured"))?;
-            execute_gemini(query, model, key)
+            execute_gemini(&full_prompt, model, key)
         }
-        ProviderKind::Ollama => execute_ollama(query, model, &config.ollama_endpoint),
+        ProviderKind::Ollama => execute_ollama(&full_prompt, model, &config.ollama_endpoint),
     }
 }
 
-/// Check if a provider is available on this system.
 pub(crate) fn is_available(provider: ProviderKind, config: &CortexConfig) -> bool {
     match provider {
         ProviderKind::Claude => {
@@ -46,8 +54,7 @@ pub(crate) fn is_available(provider: ProviderKind, config: &CortexConfig) -> boo
     }
 }
 
-/// Claude Code CLI — pipe prompt via stdin.
-fn execute_claude(query: &str, model: &str) -> Result<String> {
+fn execute_claude(prompt: &str, model: &str) -> Result<String> {
     let mut child = Command::new("/opt/homebrew/bin/claude")
         .args(["-p", "--model", model])
         .stdin(Stdio::piped())
@@ -57,69 +64,61 @@ fn execute_claude(query: &str, model: &str) -> Result<String> {
         .context("failed to spawn claude CLI")?;
 
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(query.as_bytes()).context("failed to write to claude")?;
+        stdin.write_all(prompt.as_bytes()).context("write failed")?;
     }
 
-    let output = child.wait_with_output().context("failed to wait for claude")?;
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-    if !output.status.success() {
-        anyhow::bail!("claude: {}", if stderr.is_empty() { "exit error" } else { stderr.trim() });
-    }
-
-    Ok(if stdout.trim().is_empty() { format!("[no output] {}", stderr.trim()) } else { stdout })
+    let output = child.wait_with_output().context("claude wait failed")?;
+    parse_output(&output.stdout, &output.stderr, output.status.success(), "claude")
 }
 
-/// Gemini API via reqwest (blocking).
-fn execute_gemini(query: &str, model: &str, api_key: &str) -> Result<String> {
+fn execute_gemini(prompt: &str, model: &str, api_key: &str) -> Result<String> {
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
         model, api_key
     );
-
     let body = serde_json::json!({
-        "contents": [{ "parts": [{ "text": query }] }],
+        "contents": [{ "parts": [{ "text": prompt }] }],
         "generationConfig": { "maxOutputTokens": 4096, "temperature": 0.7 }
     });
 
-    let response = reqwest::blocking::Client::new()
+    let resp = reqwest::blocking::Client::new()
         .post(&url)
         .header("Content-Type", "application/json")
         .json(&body)
         .send()
         .context("gemini request failed")?;
 
-    let parsed: serde_json::Value = response.json().context("gemini response parse failed")?;
-
+    let parsed: serde_json::Value = resp.json().context("gemini parse failed")?;
     if let Some(text) = parsed["candidates"][0]["content"]["parts"][0]["text"].as_str() {
         Ok(text.to_string())
     } else if let Some(err) = parsed["error"]["message"].as_str() {
         anyhow::bail!("gemini: {err}")
     } else {
-        anyhow::bail!("gemini: unexpected response format")
+        anyhow::bail!("gemini: unexpected response")
     }
 }
 
-/// Ollama local model via HTTP API.
-fn execute_ollama(query: &str, model: &str, endpoint: &str) -> Result<String> {
-    let body = serde_json::json!({
-        "model": model,
-        "prompt": query,
-        "stream": false
-    });
-
-    let response = reqwest::blocking::Client::new()
+fn execute_ollama(prompt: &str, model: &str, endpoint: &str) -> Result<String> {
+    let body = serde_json::json!({ "model": model, "prompt": prompt, "stream": false });
+    let resp = reqwest::blocking::Client::new()
         .post(format!("{endpoint}/api/generate"))
         .json(&body)
         .send()
         .context("ollama request failed")?;
 
-    let parsed: serde_json::Value = response.json().context("ollama response parse failed")?;
-
+    let parsed: serde_json::Value = resp.json().context("ollama parse failed")?;
     if let Some(text) = parsed["response"].as_str() {
         Ok(text.to_string())
     } else {
-        anyhow::bail!("ollama: unexpected response format")
+        anyhow::bail!("ollama: unexpected response")
     }
+}
+
+fn parse_output(stdout: &[u8], stderr: &[u8], success: bool, name: &str) -> Result<String> {
+    let out = String::from_utf8_lossy(stdout).to_string();
+    let err = String::from_utf8_lossy(stderr).to_string();
+    if !success {
+        anyhow::bail!("{name}: {}", if err.trim().is_empty() { "exit error" } else { err.trim() });
+    }
+    if out.trim().is_empty() { Ok(format!("[no output] {}", err.trim())) } else { Ok(out) }
 }
