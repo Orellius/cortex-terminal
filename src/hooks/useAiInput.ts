@@ -180,17 +180,12 @@ export function useAiInput(
             // Strip # prefix if used as explicit trigger
             const query = line.startsWith("#") ? line.slice(1).trim() : line;
 
-            // Let the Enter go through to PTY first (shows the command in terminal)
-            invoke("write_pty", {
-              paneId,
-              data: Array.from(encoder.encode("\r")),
-            }).catch(() => {});
+            // Visual newline ONLY — do NOT send to PTY (would execute as shell command)
+            term.write("\r\n");
 
-            // Show thinking indicator
+            // Show thinking indicator immediately
             const provider = detectProvider(query);
-            setTimeout(() => {
-              term.write(formatThinking(provider));
-            }, 50);
+            term.write(formatThinking(provider));
 
             // Send to AI
             invoke("send_ai_query", {

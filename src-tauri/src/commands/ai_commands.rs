@@ -19,8 +19,13 @@ fn to_err(e: impl std::fmt::Display) -> String {
 pub(crate) async fn check_providers(
     config_state: State<'_, Arc<std::sync::Mutex<CortexConfig>>>,
 ) -> Result<Vec<ProviderStatus>, String> {
-    let config = config_state.lock().map_err(|_| "config mutex poisoned".to_string())?;
+    // Clone config and drop lock BEFORE doing blocking availability checks
+    let config = {
+        let guard = config_state.lock().map_err(|_| "config mutex poisoned".to_string())?;
+        guard.clone()
+    };
 
+    // Now check availability without holding the lock
     Ok(vec![
         ProviderStatus {
             name: "Claude".into(),
