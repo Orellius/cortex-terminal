@@ -1,6 +1,8 @@
-import type { JSX } from "react";
+import { useEffect, type JSX } from "react";
 import type { Tab } from "../types";
 import { useTerminal } from "../hooks/useTerminal";
+import { useAiInput } from "../hooks/useAiInput";
+import { useAiStream } from "../hooks/useAiStream";
 import { TerminalView } from "./TerminalView";
 
 interface TabTerminalProps {
@@ -18,12 +20,22 @@ export function TabTerminal({
   showSearch,
   onCloseSearch,
 }: TabTerminalProps): JSX.Element {
-  const { termRef, terminalRef, searchRef, fitRef: _fitRef } = useTerminal(
-    tab.cwd,
-    setCwd,
-    tab.id,
-    isActive
-  );
+  const { termRef, terminalRef, searchRef, fitRef: _fitRef, aiHandlerRef } =
+    useTerminal(tab.cwd, setCwd, tab.id, isActive);
+
+  // AI input interception — # prefix detection
+  const handleAiInput = useAiInput(tab.id, terminalRef);
+
+  // Wire the AI handler into the terminal's onData path
+  useEffect(() => {
+    aiHandlerRef.current = handleAiInput;
+    return () => {
+      aiHandlerRef.current = null;
+    };
+  }, [handleAiInput, aiHandlerRef]);
+
+  // AI stream listener — renders responses inline
+  useAiStream(tab.id, terminalRef);
 
   return (
     <div

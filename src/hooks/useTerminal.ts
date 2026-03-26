@@ -14,6 +14,7 @@ interface TerminalRefs {
   terminalRef: React.RefObject<Terminal | null>;
   searchRef: React.RefObject<SearchAddon | null>;
   fitRef: React.RefObject<FitAddon | null>;
+  aiHandlerRef: React.MutableRefObject<((data: string) => void) | null>;
 }
 
 export function useTerminal(
@@ -26,6 +27,7 @@ export function useTerminal(
   const terminalRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
+  const aiHandlerRef = useRef<((data: string) => void) | null>(null);
 
   // Focus/blur the terminal when active state changes (after mount)
   useEffect(() => {
@@ -86,12 +88,18 @@ export function useTerminal(
     fitRef.current = fit;
     searchRef.current = search;
 
-    // Keystroke forwarding
+    // Keystroke forwarding — AI input interception layer
+    // When aiHandlerRef is set, keystrokes route through it (detects # prefix).
+    // Otherwise, falls back to direct PTY write.
     const dataDisposable = term.onData((data) => {
-      invoke("write_pty", {
-        paneId,
-        data: Array.from(encoder.encode(data)),
-      }).catch(() => {});
+      if (aiHandlerRef.current) {
+        aiHandlerRef.current(data);
+      } else {
+        invoke("write_pty", {
+          paneId,
+          data: Array.from(encoder.encode(data)),
+        }).catch(() => {});
+      }
     });
 
     // Track title changes (cwd reported by shell via OSC)
@@ -179,5 +187,5 @@ export function useTerminal(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cwd, paneId]);
 
-  return { termRef, terminalRef, searchRef, fitRef };
+  return { termRef, terminalRef, searchRef, fitRef, aiHandlerRef };
 }
