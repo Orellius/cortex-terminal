@@ -8,6 +8,7 @@ interface TabBarProps {
   activeTabId: string;
   homeDir: string;
   onAdd: () => void;
+  onAddShell?: () => void;
   onClose: (id: string) => void;
   onSwitch: (id: string) => void;
 }

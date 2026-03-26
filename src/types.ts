@@ -1,7 +1,10 @@
+export type TabKind = "ai" | "shell";
+
 export interface Tab {
   id: string;
   title: string;
   cwd: string;
+  kind: TabKind;
 }
 
 export interface PtyOutputPayload {

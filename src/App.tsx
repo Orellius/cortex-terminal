@@ -8,6 +8,7 @@ import { useKeyboard } from "./hooks/useKeyboard";
 import { TitleBar } from "./components/TitleBar";
 import { TabBar } from "./components/TabBar";
 import { TabTerminal } from "./components/TabTerminal";
+import { AiTabTerminal } from "./components/AiTabTerminal";
 import { StatusBar } from "./components/StatusBar";
 import { ProjectLauncher } from "./components/ProjectLauncher";
 import type { ProjectEntry } from "./types";
@@ -109,9 +110,13 @@ export function App(): JSX.Element {
     setShowSearch((prev) => !prev);
   }, []);
 
-  const addTabWithHomeDir = useCallback(() => {
-    addTab(homeDir);
-  }, [addTab, homeDir]);
+  const addAiTab = useCallback(() => {
+    addTab("ai");
+  }, [addTab]);
+
+  const addShellTab = useCallback(() => {
+    addTab("shell");
+  }, [addTab]);
 
   const closeActiveTab = useCallback(() => {
     closeTab(activeTabId);
@@ -133,7 +138,7 @@ export function App(): JSX.Element {
     showSearch,
     searchRef: searchRefProxy,
     terminalRef: terminalRefProxy,
-    addTab: addTabWithHomeDir,
+    addTab: addAiTab,
     closeTab: closeActiveTab,
     switchTabByIndex,
   });
@@ -167,7 +172,8 @@ export function App(): JSX.Element {
         tabs={tabs}
         activeTabId={activeTabId}
         homeDir={homeDir}
-        onAdd={addTabWithHomeDir}
+        onAdd={addAiTab}
+        onAddShell={addShellTab}
         onClose={closeTab}
         onSwitch={switchTab}
       />
@@ -181,16 +187,24 @@ export function App(): JSX.Element {
           position: "relative",
         }}
       >
-        {tabs.map((tab) => (
-          <TabTerminal
-            key={tab.id}
-            tab={tab}
-            isActive={tab.id === activeTabId}
-            setCwd={(cwd) => updateTabCwd(tab.id, cwd)}
-            showSearch={showSearch}
-            onCloseSearch={handleCloseSearch}
-          />
-        ))}
+        {tabs.map((tab) =>
+          tab.kind === "ai" ? (
+            <AiTabTerminal
+              key={tab.id}
+              tab={tab}
+              isActive={tab.id === activeTabId}
+            />
+          ) : (
+            <TabTerminal
+              key={tab.id}
+              tab={tab}
+              isActive={tab.id === activeTabId}
+              setCwd={(cwd) => updateTabCwd(tab.id, cwd)}
+              showSearch={showSearch}
+              onCloseSearch={handleCloseSearch}
+            />
+          )
+        )}
       </div>
 
       <StatusBar
