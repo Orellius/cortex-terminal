@@ -8,11 +8,11 @@
     "core:event:default",
     {
       "identifier": "core:event:allow-emit",
-      "allow": [{ "event": "pty:*" }, { "event": "session:*" }]
+      "allow": [{ "event": "pty:*" }, { "event": "session:*" }, { "event": "cortex:*" }]
     },
     {
       "identifier": "core:event:allow-listen",
-      "allow": [{ "event": "pty:*" }, { "event": "session:*" }]
+      "allow": [{ "event": "pty:*" }, { "event": "session:*" }, { "event": "cortex:*" }]
     }
   ]
 }
