@@ -17,6 +17,9 @@ export function formatAiResponse(opts: FormatOptions): string {
   const duration = (opts.durationMs / 1000).toFixed(1);
   const verifyBadge = opts.verified ? "" : ` ${DIM}[unverified]${RESET}`;
 
+  // Strip <think>...</think> blocks from model output
+  const cleaned = stripThinkTags(opts.content);
+
   const lines: string[] = [];
 
   // Header: provider badge
@@ -24,8 +27,8 @@ export function formatAiResponse(opts: FormatOptions): string {
   lines.push(`${color}${BOLD} ${label} ${RESET} ${DIM}${opts.model}${RESET}${verifyBadge}`);
   lines.push(`${DIM}${"─".repeat(60)}${RESET}`);
 
-  // Content
-  const contentLines = opts.content.trimEnd().split("\n");
+  // Content — cleaned of thinking tags
+  const contentLines = cleaned.trimEnd().split("\n");
   for (const line of contentLines) {
     lines.push(line);
   }
@@ -36,6 +39,18 @@ export function formatAiResponse(opts: FormatOptions): string {
   lines.push("");
 
   return lines.join("\r\n");
+}
+
+/** Strip <think>...</think> reasoning blocks from model output.
+ *  Nemotron-Cascade-2 and similar models wrap reasoning in these tags. */
+function stripThinkTags(content: string): string {
+  // Remove everything between <think> and </think> (including tags)
+  let result = content.replace(/<think>[\s\S]*?<\/think>/gi, "");
+  // Also handle unclosed <think> (model still thinking at output end)
+  result = result.replace(/<think>[\s\S]*/gi, "");
+  // Clean up extra leading newlines from removal
+  result = result.replace(/^\n+/, "");
+  return result.trim();
 }
 
 /** Format a "thinking" indicator */
