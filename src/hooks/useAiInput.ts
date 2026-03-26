@@ -107,14 +107,32 @@ function isAiQuery(input: string): boolean {
   // Contains && or || → shell
   if (trimmed.includes("&&") || trimmed.includes("||")) return false;
 
+  // Contains ? → almost certainly AI (shell commands don't end with ?)
+  if (trimmed.includes("?")) return true;
+
+  // Greetings → AI
+  const greetings = ["hi", "hey", "hello", "yo", "sup", "thanks", "thank", "please", "sorry"];
+  if (greetings.includes(firstToken)) return true;
+
   // AI signals in the text → definitely AI
   for (const signal of AI_SIGNALS) {
     if (lower.includes(signal)) return true;
   }
 
   // Starts with a question word → AI
-  const questionWords = ["what", "why", "how", "where", "when", "who", "which", "is", "are", "can", "could", "should", "would", "do", "does", "did"];
+  const questionWords = [
+    "what", "why", "how", "where", "when", "who", "whom", "whose",
+    "which", "is", "are", "can", "could", "should", "would",
+    "do", "does", "did", "will", "shall", "may", "might",
+  ];
   if (questionWords.includes(firstToken)) return true;
+
+  // First token not a known command AND not a path → likely AI
+  if (!SHELL_COMMANDS.has(firstToken) && /^[a-z]/.test(firstToken)) {
+    const wordCount = trimmed.split(/\s+/).length;
+    // 3+ words that don't start with a command → AI
+    if (wordCount >= 3) return true;
+  }
 
   // Long input (>5 words) with no command match → likely AI
   const wordCount = trimmed.split(/\s+/).length;
