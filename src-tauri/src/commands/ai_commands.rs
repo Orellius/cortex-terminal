@@ -19,33 +19,39 @@ fn to_err(e: impl std::fmt::Display) -> String {
 pub(crate) async fn check_providers(
     config_state: State<'_, Arc<std::sync::Mutex<CortexConfig>>>,
 ) -> Result<Vec<ProviderStatus>, String> {
-    // Clone config and drop lock BEFORE doing blocking availability checks
     let config = {
         let guard = config_state.lock().map_err(|_| "config mutex poisoned".to_string())?;
         guard.clone()
     };
 
-    // Now check availability without holding the lock
-    Ok(vec![
-        ProviderStatus {
-            name: "Claude".into(),
-            kind: ProviderKind::Claude,
-            available: providers::is_available(ProviderKind::Claude, &config),
-            model: config.claude_model.clone(),
-        },
-        ProviderStatus {
-            name: "Gemini".into(),
-            kind: ProviderKind::Gemini,
-            available: providers::is_available(ProviderKind::Gemini, &config),
-            model: config.gemini_model.clone(),
-        },
-        ProviderStatus {
-            name: "Ollama".into(),
-            kind: ProviderKind::Ollama,
-            available: providers::is_available(ProviderKind::Ollama, &config),
-            model: config.ollama_model.clone(),
-        },
-    ])
+    // Run blocking availability checks in spawn_blocking to avoid Tokio panic
+    let config_clone = config.clone();
+    let statuses = tokio::task::spawn_blocking(move || {
+        vec![
+            ProviderStatus {
+                name: "Claude".into(),
+                kind: ProviderKind::Claude,
+                available: providers::is_available(ProviderKind::Claude, &config_clone),
+                model: config_clone.claude_model.clone(),
+            },
+            ProviderStatus {
+                name: "Gemini".into(),
+                kind: ProviderKind::Gemini,
+                available: providers::is_available(ProviderKind::Gemini, &config_clone),
+                model: config_clone.gemini_model.clone(),
+            },
+            ProviderStatus {
+                name: "Ollama".into(),
+                kind: ProviderKind::Ollama,
+                available: providers::is_available(ProviderKind::Ollama, &config_clone),
+                model: config_clone.ollama_model.clone(),
+            },
+        ]
+    })
+    .await
+    .map_err(|e| format!("provider check failed: {e}"))?;
+
+    Ok(statuses)
 }
 
 #[tauri::command]
