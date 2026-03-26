@@ -67,10 +67,31 @@ export function formatAiResponse(opts: FormatOptions): string {
   return lines.join("\r\n");
 }
 
-/** Strip <think>...</think> reasoning blocks from model output */
+/** Strip ALL thinking/reasoning blocks from model output.
+ *  Handles: <think>...</think>, unclosed <think>, </think> without opener,
+ *  and any other XML-like reasoning tags models might emit. */
 function stripThinkTags(content: string): string {
-  let result = content.replace(/<think>[\s\S]*?<\/think>/gi, "");
+  let result = content;
+
+  // Strip <think>...</think> (with content)
+  result = result.replace(/<think>[\s\S]*?<\/think>/gi, "");
+
+  // Strip unclosed <think>... (thinking at end, no close tag)
   result = result.replace(/<think>[\s\S]*/gi, "");
+
+  // Strip everything BEFORE </think> (thinking at start, no open tag)
+  const closeIdx = result.indexOf("</think>");
+  if (closeIdx !== -1) {
+    result = result.substring(closeIdx + "</think>".length);
+  }
+
+  // Also strip <quote>, </quote> and similar tags
+  result = result.replace(/<\/?quote>/gi, "");
+  result = result.replace(/<\/?output>/gi, "");
+  result = result.replace(/<\/?response>/gi, "");
+  result = result.replace(/<\/?answer>/gi, "");
+
+  // Clean up whitespace
   result = result.replace(/^\n+/, "");
   return result.trim();
 }

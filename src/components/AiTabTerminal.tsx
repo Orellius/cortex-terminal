@@ -27,6 +27,8 @@ export function AiTabTerminal({
         style={{
           flex: 1,
           minHeight: 0,
+          paddingLeft: "0.5rem",
+          paddingTop: "0.25rem",
         }}
       />
     </div>

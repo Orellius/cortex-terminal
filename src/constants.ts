@@ -1,4 +1,4 @@
-export const TITLE_BAR_HEIGHT = "1.75rem";
+export const TITLE_BAR_HEIGHT = "2.25rem";
 export const TAB_BAR_HEIGHT = "2rem";
 export const STATUS_BAR_HEIGHT = "1.75rem";
 
