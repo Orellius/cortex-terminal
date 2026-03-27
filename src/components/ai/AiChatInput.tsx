@@ -103,14 +103,13 @@ export function AiChatInput({ onSubmit, disabled }: AiChatInputProps): JSX.Eleme
   }, []);
 
   return (
-    <div style={{ padding: "0.5rem 0.75rem 0.625rem" }}>
+    <div>
       <div
         style={{
-          border: "1px solid rgba(255, 255, 255, 0.08)",
-          borderRadius: "0.5rem",
-          background: "rgba(255, 255, 255, 0.02)",
+          borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+          background: "transparent",
           overflow: "hidden",
-          transition: "border-color 150ms",
         }}
       >
         <div style={{ display: "flex", alignItems: "flex-start" }}>
