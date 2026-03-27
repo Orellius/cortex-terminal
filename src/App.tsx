@@ -13,6 +13,7 @@ import { StatusBar } from "./components/StatusBar";
 import { ProjectLauncher } from "./components/ProjectLauncher";
 import { SettingsOverlay } from "./components/settings/SettingsOverlay";
 import { PasteHistory } from "./components/PasteHistory";
+import { CommandPalette, buildCommands } from "./components/CommandPalette";
 import { usePasteHistory } from "./hooks/usePasteHistory";
 import type { ProjectEntry } from "./types";
 import type { Terminal } from "@xterm/xterm";
@@ -28,6 +29,7 @@ export function App(): JSX.Element {
     closeTab,
     switchTab,
     updateTabCwd,
+    updateTabTitle,
     splitPane,
     closePaneInTab,
     setActivePaneInTab,
@@ -66,6 +68,7 @@ export function App(): JSX.Element {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const pasteHistory = usePasteHistory();
 
   // Stable sentinel refs for keyboard hook (always point to active tab's refs)
@@ -176,6 +179,7 @@ export function App(): JSX.Element {
     splitHorizontal: () => splitPane("horizontal"),
     togglePasteHistory: pasteHistory.toggleHistory,
     reopenClosedTab: reopenLastClosedTab,
+    toggleCommandPalette: () => setShowCommandPalette((p) => !p),
   });
 
   const { branch, usage } = useStatusPoll(activeTab?.cwd ?? "");
@@ -184,7 +188,7 @@ export function App(): JSX.Element {
     ? (activeTab?.cwd ?? "").replace(homeDir, "~")
     : activeTab?.cwd || "~";
 
-  void showSearch; // used later when search is wired into split panes
+  // showSearch is passed to SplitPaneLayout below
 
   return (
     <div
@@ -206,6 +210,7 @@ export function App(): JSX.Element {
         onAddShell={addShellTab}
         onClose={closeTab}
         onSwitch={switchTab}
+        onRename={updateTabTitle}
       />
 
       <div
@@ -236,6 +241,8 @@ export function App(): JSX.Element {
               onActivatePane={(paneId) => setActivePaneInTab(tab.id, paneId)}
               onClosePane={(paneId) => closePaneInTab(tab.id, paneId)}
               setCwd={(cwd) => updateTabCwd(tab.id, cwd)}
+              showSearch={showSearch && tab.id === activeTabId}
+              onCloseSearch={() => setShowSearch(false)}
             />
           </div>
         ))}
@@ -263,6 +270,23 @@ export function App(): JSX.Element {
           onSelect={() => {}}
           onClose={pasteHistory.closeHistory}
           onClear={pasteHistory.clearHistory}
+        />
+      )}
+      {showCommandPalette && (
+        <CommandPalette
+          commands={buildCommands({
+            addAiTab,
+            addShellTab,
+            toggleSettings: () => { setShowCommandPalette(false); setShowSettings(true); },
+            toggleSearch: () => { setShowCommandPalette(false); setShowSearch(true); },
+            openLauncher: () => { setShowCommandPalette(false); openLauncher(); },
+            splitVertical: () => splitPane("vertical"),
+            splitHorizontal: () => splitPane("horizontal"),
+            togglePasteHistory: pasteHistory.toggleHistory,
+            closeTab: () => closeTab(activeTabId),
+            reopenClosedTab: reopenLastClosedTab,
+          })}
+          onClose={() => setShowCommandPalette(false)}
         />
       )}
     </div>

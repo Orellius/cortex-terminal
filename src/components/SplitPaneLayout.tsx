@@ -12,6 +12,8 @@ interface SplitPaneLayoutProps {
   onActivatePane: (paneId: string) => void;
   onClosePane: (paneId: string) => void;
   setCwd: (cwd: string) => void;
+  showSearch: boolean;
+  onCloseSearch: () => void;
 }
 
 export function SplitPaneLayout({
@@ -23,6 +25,8 @@ export function SplitPaneLayout({
   onActivatePane,
   onClosePane,
   setCwd,
+  showSearch,
+  onCloseSearch,
 }: SplitPaneLayoutProps): JSX.Element {
   // Single pane — no split layout
   if (panes.length <= 1) {
@@ -33,6 +37,8 @@ export function SplitPaneLayout({
         pane={pane}
         isActive={isTabActive}
         setCwd={setCwd}
+        showSearch={showSearch}
+        onCloseSearch={onCloseSearch}
       />
     );
   }
@@ -46,6 +52,8 @@ export function SplitPaneLayout({
       onActivatePane={onActivatePane}
       onClosePane={onClosePane}
       setCwd={setCwd}
+      showSearch={showSearch}
+      onCloseSearch={onCloseSearch}
     />
   );
 }
@@ -60,6 +68,8 @@ interface ResizableSplitProps {
   onActivatePane: (paneId: string) => void;
   onClosePane: (paneId: string) => void;
   setCwd: (cwd: string) => void;
+  showSearch: boolean;
+  onCloseSearch: () => void;
 }
 
 function ResizableSplit({
@@ -70,6 +80,8 @@ function ResizableSplit({
   onActivatePane,
   onClosePane,
   setCwd,
+  showSearch,
+  onCloseSearch,
 }: ResizableSplitProps): JSX.Element {
   const isVertical = splitDirection === "vertical";
   const containerRef = useRef<HTMLDivElement>(null);
@@ -128,6 +140,8 @@ function ResizableSplit({
           onClose={() => onClosePane(pane.id)}
           onDrag={(delta) => handleDrag(index, delta)}
           setCwd={setCwd}
+          showSearch={showSearch && pane.id === activePaneId}
+          onCloseSearch={onCloseSearch}
         />
       ))}
     </div>
@@ -147,6 +161,8 @@ interface PaneWithDividerProps {
   onClose: () => void;
   onDrag: (delta: number) => void;
   setCwd: (cwd: string) => void;
+  showSearch: boolean;
+  onCloseSearch: () => void;
 }
 
 function PaneWithDivider({
@@ -160,6 +176,8 @@ function PaneWithDivider({
   onClose,
   onDrag,
   setCwd,
+  showSearch,
+  onCloseSearch,
 }: PaneWithDividerProps): JSX.Element {
   const dragging = useRef(false);
   const lastPos = useRef(0);
@@ -261,7 +279,7 @@ function PaneWithDivider({
           </div>
         )}
 
-        <SinglePane pane={pane} isActive={isActive} setCwd={setCwd} />
+        <SinglePane pane={pane} isActive={isActive} setCwd={setCwd} showSearch={showSearch} onCloseSearch={onCloseSearch} />
       </div>
 
       {/* Resize divider */}
@@ -295,11 +313,13 @@ interface SinglePaneProps {
   pane: Pane;
   isActive: boolean;
   setCwd: (cwd: string) => void;
+  showSearch: boolean;
+  onCloseSearch: () => void;
 }
 
-function SinglePane({ pane, isActive, setCwd }: SinglePaneProps): JSX.Element {
+function SinglePane({ pane, isActive, setCwd, showSearch, onCloseSearch }: SinglePaneProps): JSX.Element {
   if (pane.kind === "ai") {
-    return <AiChatView paneId={pane.id} isActive={isActive} cwd={pane.cwd} />;
+    return <AiChatView paneId={pane.id} isActive={isActive} cwd={pane.cwd} showSearch={showSearch} onCloseSearch={onCloseSearch} />;
   }
 
   return (
@@ -315,8 +335,8 @@ function SinglePane({ pane, isActive, setCwd }: SinglePaneProps): JSX.Element {
       }}
       isActive={isActive}
       setCwd={setCwd}
-      showSearch={false}
-      onCloseSearch={() => {}}
+      showSearch={showSearch}
+      onCloseSearch={onCloseSearch}
     />
   );
 }

@@ -18,6 +18,7 @@ interface KeyboardCallbacks {
   splitHorizontal: () => void;
   togglePasteHistory: () => void;
   reopenClosedTab: () => void;
+  toggleCommandPalette: () => void;
 }
 
 export function useKeyboard({
@@ -36,10 +37,18 @@ export function useKeyboard({
   splitHorizontal,
   togglePasteHistory,
   reopenClosedTab,
+  toggleCommandPalette,
 }: KeyboardCallbacks): void {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!e.metaKey) return;
+
+      // Cmd+Shift+P = command palette
+      if ((e.key === "p" || e.key === "P") && e.shiftKey) {
+        e.preventDefault();
+        toggleCommandPalette();
+        return;
+      }
 
       // Cmd+Shift+H = paste history
       if (e.key === "h" && e.shiftKey) {
@@ -125,5 +134,6 @@ export function useKeyboard({
     splitHorizontal,
     togglePasteHistory,
     reopenClosedTab,
+    toggleCommandPalette,
   ]);
 }

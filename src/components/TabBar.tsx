@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import type { JSX } from "react";
 import type { Tab } from "../types";
 import { TAB_BAR_HEIGHT } from "../constants";
@@ -11,6 +11,7 @@ interface TabBarProps {
   onAddShell?: () => void;
   onClose: (id: string) => void;
   onSwitch: (id: string) => void;
+  onRename?: (id: string, title: string) => void;
 }
 
 function shortenPath(fullPath: string, homeDir: string): string {
@@ -27,8 +28,25 @@ export function TabBar({
   onAdd,
   onClose,
   onSwitch,
+  onRename,
 }: TabBarProps): JSX.Element {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const editRef = useRef<HTMLInputElement>(null);
+
+  const startRename = useCallback((tabId: string, currentTitle: string) => {
+    setEditingId(tabId);
+    setEditValue(currentTitle);
+    requestAnimationFrame(() => editRef.current?.select());
+  }, []);
+
+  const commitRename = useCallback(() => {
+    if (editingId && editValue.trim() && onRename) {
+      onRename(editingId, editValue.trim());
+    }
+    setEditingId(null);
+  }, [editingId, editValue, onRename]);
 
   return (
     <div
@@ -85,16 +103,32 @@ export function TabBar({
               position: "relative",
             }}
           >
-            <span
-              style={{
-                maxWidth: "10rem",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {label}
-            </span>
+            {editingId === tab.id ? (
+              <input
+                ref={editRef}
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitRename();
+                  if (e.key === "Escape") setEditingId(null);
+                  e.stopPropagation();
+                }}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: "transparent", border: "none", outline: "none",
+                  color: "#e4e4e7", fontFamily: '"Geist Mono", Menlo, monospace',
+                  fontSize: "0.75rem", width: "8rem", padding: 0,
+                }}
+              />
+            ) : (
+              <span
+                onDoubleClick={(e) => { e.stopPropagation(); startRename(tab.id, shortenPath(tab.title || tab.cwd, homeDir)); }}
+                style={{ maxWidth: "10rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
+                {label}
+              </span>
+            )}
 
             {showClose && (
               <button

@@ -23,12 +23,15 @@ interface AiChatViewProps {
   paneId: string;
   isActive: boolean;
   cwd: string;
+  showSearch?: boolean;
+  onCloseSearch?: () => void;
 }
 
-export function AiChatView({ paneId, isActive, cwd }: AiChatViewProps): JSX.Element {
+export function AiChatView({ paneId, isActive, cwd, showSearch, onCloseSearch }: AiChatViewProps): JSX.Element {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [thinking, setThinking] = useState<{ provider: string; startTime: number } | null>(null);
   const [sidebarFile, setSidebarFile] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [sidebarContent, setSidebarContent] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const conversationId = useRef<string | null>(null);
@@ -307,6 +310,44 @@ export function AiChatView({ paneId, isActive, cwd }: AiChatViewProps): JSX.Elem
         />
       </div>
 
+      {/* Search bar */}
+      {showSearch && (
+        <div style={{
+          position: "absolute", top: 0, right: "0.5rem", zIndex: 10,
+          display: "flex", alignItems: "center", gap: "0.375rem",
+          padding: "0.25rem 0.5rem", background: "#1a1a1e",
+          border: "1px solid rgba(255,255,255,0.06)", borderTop: "none",
+          borderRadius: "0 0 0.375rem 0.375rem",
+        }}>
+          <input
+            autoFocus
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { setSearchQuery(""); onCloseSearch?.(); }
+            }}
+            placeholder="Find in chat..."
+            style={{
+              background: "transparent", border: "none", outline: "none", width: "12rem",
+              fontFamily: '"Geist Mono", monospace', fontSize: "0.75rem", color: "#d4d4d8",
+              padding: "0.125rem 0",
+            }}
+          />
+          {searchQuery && (
+            <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: "0.625rem", color: "#52525b" }}>
+              {messages.filter((m) => m.content.toLowerCase().includes(searchQuery.toLowerCase())).length} matches
+            </span>
+          )}
+          <button
+            onClick={() => { setSearchQuery(""); onCloseSearch?.(); }}
+            style={{ background: "transparent", border: "none", color: "#52525b", cursor: "pointer", fontFamily: '"Geist Mono", monospace', fontSize: "0.75rem", padding: "0 0.125rem", lineHeight: 1 }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Messages area — scrollable */}
       <div
         ref={scrollRef}
@@ -329,14 +370,20 @@ export function AiChatView({ paneId, isActive, cwd }: AiChatViewProps): JSX.Elem
           </div>
         )}
 
-        {messages.map((msg) => (
-          <AiMessage
-            key={msg.id}
-            message={msg}
-            onOpenFile={openMarkdownFile}
-            onOpenContent={openMarkdownContent}
-          />
-        ))}
+        {messages.map((msg) => {
+          const matches = searchQuery
+            ? msg.content.toLowerCase().includes(searchQuery.toLowerCase())
+            : true;
+          return (
+            <div key={msg.id} style={{ opacity: searchQuery && !matches ? 0.2 : 1, transition: "opacity 150ms" }}>
+              <AiMessage
+                message={msg}
+                onOpenFile={openMarkdownFile}
+                onOpenContent={openMarkdownContent}
+              />
+            </div>
+          );
+        })}
 
         {thinking && (
           <AiThinkingIndicator
