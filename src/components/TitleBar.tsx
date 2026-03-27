@@ -21,7 +21,7 @@ export function TitleBar({ shortPath }: TitleBarProps): JSX.Element {
         paddingLeft: "5rem",
         paddingRight: "0.75rem",
         // Ensure the entire bar is draggable
-        WebkitUserSelect: "none" as string,
+        WebkitUserSelect: "none" as const,
       }}
     >
       <span
