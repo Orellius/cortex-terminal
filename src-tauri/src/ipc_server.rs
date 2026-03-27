@@ -14,7 +14,7 @@ use crate::ai::database::Database;
 /// Start the IPC server on a background task.
 /// Listens for single-line JSON commands on ~/.cortex/cortex.sock.
 pub fn start_ipc_server(app: AppHandle, db: Arc<Database>) {
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         if let Err(e) = run_server(app, db).await {
             log::error!("IPC server error: {e}");
         }
