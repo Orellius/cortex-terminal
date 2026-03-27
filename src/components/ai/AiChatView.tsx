@@ -238,22 +238,27 @@ export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
         {messages.length === 0 && !thinking && (
           <div
             style={{
-              color: "#27272a",
               fontFamily: '"Geist Mono", Menlo, monospace',
-              fontSize: "0.75rem",
               lineHeight: 1.8,
               marginTop: "2rem",
             }}
           >
-            <div style={{ color: "#3f3f46", fontWeight: 600, marginBottom: "0.25rem" }}>
-              Cortex AI Terminal
+            <div style={{ color: "#e4e4e7", fontWeight: 600, fontSize: "0.875rem", marginBottom: "0.5rem" }}>
+              Cortex Terminal Initialized
             </div>
-            <div>Type naturally. Models route automatically.</div>
-            <div>Prefix ! for shell commands.</div>
-            <div style={{ marginTop: "0.5rem" }}>
-              <span style={{ color: "#3f3f46" }}>c:</span> Claude{" "}
-              <span style={{ color: "#3f3f46" }}>g:</span> Gemini{" "}
-              <span style={{ color: "#3f3f46" }}>l:</span> Local
+            <div style={{ color: "#10b981", fontSize: "0.6875rem", marginBottom: "0.75rem" }}>
+              LLMs connected. Ready.
+            </div>
+            <div style={{ color: "#3f3f46", fontSize: "0.6875rem" }}>
+              Type naturally. Models route automatically.
+            </div>
+            <div style={{ color: "#3f3f46", fontSize: "0.6875rem" }}>
+              Prefix <span style={{ color: "#52525b" }}>!</span> for shell commands.
+            </div>
+            <div style={{ color: "#27272a", fontSize: "0.6875rem", marginTop: "0.5rem" }}>
+              <span style={{ color: "#8b5cf6" }}>c:</span> Claude{" "}
+              <span style={{ color: "#8b5cf6" }}>s:</span> Sonnet{" "}
+              <span style={{ color: "#10b981" }}>l:</span> Local
             </div>
           </div>
         )}
