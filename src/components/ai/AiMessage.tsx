@@ -39,13 +39,15 @@ const MODEL_DISPLAY: Record<string, string> = {
 
 interface AiMessageProps {
   message: ChatMessage;
+  onOpenFile?: (path: string) => void;
+  onOpenContent?: (content: string) => void;
 }
 
-export function AiMessage({ message }: AiMessageProps): JSX.Element {
+export function AiMessage({ message, onOpenFile, onOpenContent }: AiMessageProps): JSX.Element {
   if (message.role === "user") {
     return <UserMessage content={message.content} />;
   }
-  return <AssistantMessage message={message} />;
+  return <AssistantMessage message={message} onOpenFile={onOpenFile} onOpenContent={onOpenContent} />;
 }
 
 function UserMessage({ content }: { content: string }): JSX.Element {
@@ -67,7 +69,11 @@ function UserMessage({ content }: { content: string }): JSX.Element {
   );
 }
 
-function AssistantMessage({ message }: { message: ChatMessage }): JSX.Element {
+function AssistantMessage({ message, onOpenFile, onOpenContent }: {
+  message: ChatMessage;
+  onOpenFile?: (path: string) => void;
+  onOpenContent?: (content: string) => void;
+}): JSX.Element {
   const provider = message.provider ?? "ollama";
   const model = message.model ?? "";
   const color = PROVIDER_COLORS[provider] ?? "#52525b";
@@ -124,6 +130,19 @@ function AssistantMessage({ message }: { message: ChatMessage }): JSX.Element {
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
         }}
+        onClick={(e) => {
+          const target = e.target as HTMLElement;
+          const filePath = target.getAttribute("data-file-path");
+          if (filePath && onOpenFile) {
+            e.preventDefault();
+            onOpenFile(filePath);
+          }
+          const mdContent = target.getAttribute("data-md-content");
+          if (mdContent && onOpenContent) {
+            e.preventDefault();
+            onOpenContent(decodeURIComponent(mdContent));
+          }
+        }}
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: rendered }}
       />
@@ -144,7 +163,7 @@ function AssistantMessage({ message }: { message: ChatMessage }): JSX.Element {
   );
 }
 
-/** Basic HTML markdown rendering */
+/** Basic HTML markdown rendering with clickable .md file tags */
 function renderMarkdown(text: string): string {
   const lines = text.split("\n");
   const result: string[] = [];
@@ -161,11 +180,20 @@ function renderMarkdown(text: string): string {
       } else {
         inCodeBlock = false;
         const escaped = codeBuffer.map(escapeHtml).join("\n");
+        const rawContent = codeBuffer.join("\n");
         const langLabel = codeLang
           ? `<div style="font-size:0.625rem;color:#52525b;margin-bottom:0.25rem">${escapeHtml(codeLang)}</div>`
           : "";
+        // If it's markdown content, make the block clickable to open in sidebar
+        const isMarkdown = codeLang === "md" || codeLang === "markdown";
+        const clickAttr = isMarkdown
+          ? ` data-md-content="${encodeURIComponent(rawContent)}" style="cursor:pointer;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:0.375rem;padding:0.5rem 0.625rem;margin:0.375rem 0;font-family:'Geist Mono',Menlo,monospace;font-size:0.75rem;color:#a1a1aa;overflow-x:auto"`
+          : ` style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:0.375rem;padding:0.5rem 0.625rem;margin:0.375rem 0;font-family:'Geist Mono',Menlo,monospace;font-size:0.75rem;color:#a1a1aa;overflow-x:auto"`;
+        const viewHint = isMarkdown
+          ? `<div style="font-size:0.5625rem;color:#05a0ef;margin-top:0.25rem;cursor:pointer" data-md-content="${encodeURIComponent(rawContent)}">Click to preview</div>`
+          : "";
         result.push(
-          `<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:0.375rem;padding:0.5rem 0.625rem;margin:0.375rem 0;font-family:'Geist Mono',Menlo,monospace;font-size:0.75rem;color:#a1a1aa;overflow-x:auto">${langLabel}<pre style="margin:0;white-space:pre-wrap">${escaped}</pre></div>`
+          `<div${clickAttr}>${langLabel}<pre style="margin:0;white-space:pre-wrap">${escaped}</pre>${viewHint}</div>`
         );
         codeLang = "";
       }
@@ -195,6 +223,15 @@ function renderMarkdown(text: string): string {
     processed = processed.replace(
       /`([^`]+)`/g,
       '<code style="background:rgba(255,255,255,0.06);padding:0.125rem 0.25rem;border-radius:0.25rem;font-family:\'Geist Mono\',Menlo,monospace;font-size:0.75rem;color:#a1a1aa">$1</code>'
+    );
+
+    // .md file references → clickable tags
+    processed = processed.replace(
+      /(?:^|\s)([\w./~-]+\.md)\b/g,
+      (match, filePath: string) => {
+        const tag = `<span data-file-path="${escapeHtml(filePath)}" style="color:#05a0ef;cursor:pointer;text-decoration:underline;text-decoration-color:rgba(5,160,239,0.3);text-underline-offset:0.125rem">${escapeHtml(filePath)}</span>`;
+        return match.startsWith(" ") ? ` ${tag}` : tag;
+      }
     );
 
     // Bullet points

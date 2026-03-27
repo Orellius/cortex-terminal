@@ -179,6 +179,39 @@ pub(crate) fn get_claude_usage() -> Result<ClaudeUsage, String> {
 }
 
 // ---------------------------------------------------------------------------
+// File reading (for markdown sidebar)
+// ---------------------------------------------------------------------------
+
+/// Read a file's content as UTF-8 string. Used by the markdown sidebar.
+#[tauri::command]
+pub(crate) async fn read_file_content(path: String) -> Result<String, String> {
+    let p = Path::new(&path);
+
+    // Expand ~ to home dir
+    let expanded = if path.starts_with("~/") {
+        let home = std::env::var("HOME").map_err(|_| "HOME not set")?;
+        Path::new(&home).join(&path[2..])
+    } else {
+        p.to_path_buf()
+    };
+
+    if !expanded.exists() {
+        return Err(format!("file not found: {}", expanded.display()));
+    }
+    if !expanded.is_file() {
+        return Err(format!("not a file: {}", expanded.display()));
+    }
+
+    // Safety: limit to 2MB
+    let meta = fs::metadata(&expanded).map_err(|e| format!("metadata error: {e}"))?;
+    if meta.len() > 2_097_152 {
+        return Err("file too large (>2MB)".to_string());
+    }
+
+    fs::read_to_string(&expanded).map_err(|e| format!("read error: {e}"))
+}
+
+// ---------------------------------------------------------------------------
 // Project launcher
 // ---------------------------------------------------------------------------
 

@@ -16,7 +16,9 @@ use commands::ai_commands::{
 };
 use commands::chat_commands::{add_message, create_conversation, get_messages, list_conversations};
 use commands::pty_commands::{kill_pty, resize_pty, spawn_pty, write_pty, PtyState};
-use commands::status_commands::{get_claude_usage, get_git_branch, get_home_dir, list_projects};
+use commands::status_commands::{
+    get_claude_usage, get_git_branch, get_home_dir, list_projects, read_file_content,
+};
 use pty::PtyManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -60,7 +62,7 @@ pub fn run() {
             // PTY
             spawn_pty, write_pty, resize_pty, kill_pty,
             // Status
-            get_git_branch, get_claude_usage, get_home_dir, list_projects,
+            get_git_branch, get_claude_usage, get_home_dir, list_projects, read_file_content,
             // AI
             check_providers, send_ai_query, get_ai_config, update_ai_config, get_budget_status,
             scan_ai_clis, list_ollama_models,

@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { AiMessage, type ChatMessage } from "./AiMessage";
 import { AiChatInput } from "./AiChatInput";
 import { AiThinkingIndicator } from "./AiThinkingIndicator";
+import { MarkdownSidebar } from "./MarkdownSidebar";
 import watermark from "../../assets/cortex-watermark.png";
 
 interface AiStreamEvent {
@@ -25,8 +26,25 @@ interface AiChatViewProps {
 export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [thinking, setThinking] = useState<{ provider: string; startTime: number } | null>(null);
+  const [sidebarFile, setSidebarFile] = useState<string | null>(null);
+  const [sidebarContent, setSidebarContent] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const conversationId = useRef<string | null>(null);
+
+  const openMarkdownFile = useCallback((filePath: string) => {
+    setSidebarFile(filePath);
+    setSidebarContent(null);
+  }, []);
+
+  const openMarkdownContent = useCallback((content: string) => {
+    setSidebarFile(null);
+    setSidebarContent(content);
+  }, []);
+
+  const closeSidebar = useCallback(() => {
+    setSidebarFile(null);
+    setSidebarContent(null);
+  }, []);
 
   // Create conversation on mount
   useEffect(() => {
@@ -224,7 +242,12 @@ export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
         )}
 
         {messages.map((msg) => (
-          <AiMessage key={msg.id} message={msg} />
+          <AiMessage
+            key={msg.id}
+            message={msg}
+            onOpenFile={openMarkdownFile}
+            onOpenContent={openMarkdownContent}
+          />
         ))}
 
         {thinking && (
@@ -237,6 +260,13 @@ export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
 
       {/* Fixed input at bottom */}
       <AiChatInput onSubmit={handleSubmit} disabled={thinking !== null} />
+
+      {/* Markdown sidebar */}
+      <MarkdownSidebar
+        filePath={sidebarFile}
+        content={sidebarContent}
+        onClose={closeSidebar}
+      />
     </div>
   );
 }
