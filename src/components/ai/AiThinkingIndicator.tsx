@@ -65,16 +65,26 @@ export function AiThinkingIndicator({ provider, startTime }: Props): JSX.Element
   const lines = THINKING_LINES[provider] ?? THINKING_LINES.ollama;
   const shuffledRef = useRef([...lines].sort(() => Math.random() - 0.5));
 
+  const [textIndex, setTextIndex] = useState(0);
+
+  // Spinner: fast (80ms)
   useEffect(() => {
     const interval = setInterval(() => {
       setFrame((f) => f + 1);
-    }, 100);
+    }, 80);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Text: slow (2.5s per phrase — feels like a distinct thinking step)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTextIndex((i) => i + 1);
+    }, 2500);
     return () => clearInterval(interval);
   }, []);
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   const spinner = SPINNER[frame % SPINNER.length];
-  const textIndex = Math.floor(frame / 3);
   const statusText = shuffledRef.current[textIndex % shuffledRef.current.length];
 
   return (
