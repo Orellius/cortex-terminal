@@ -12,9 +12,9 @@ use ai::config;
 use ai::database::Database;
 use ai::types::CortexConfig;
 use commands::ai_commands::{
-    check_providers, get_ai_config, get_budget_status, get_mcp_servers,
-    import_mcp_from_claude_config, list_ollama_models, save_mcp_servers, scan_ai_clis,
-    send_ai_query, update_ai_config,
+    call_mcp_tool, check_providers, get_ai_config, get_budget_status, get_mcp_servers,
+    get_mcp_tools, import_mcp_from_claude_config, list_ollama_models, save_mcp_servers,
+    scan_ai_clis, send_ai_query, start_mcp_bridge, stop_mcp_bridge, update_ai_config,
 };
 use commands::chat_commands::{
     add_message, create_conversation, get_messages, list_conversations, restore_session,
@@ -30,6 +30,7 @@ use pty::PtyManager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let pty_state: PtyState = Arc::new(Mutex::new(PtyManager::new()));
+    let mcp_state: ai::mcp::McpBridgeState = Arc::new(Mutex::new(ai::mcp::McpBridge::new()));
 
     // Load AI config from ~/.cortex/config.toml
     let cortex_config = config::load_config().unwrap_or_else(|e| {
@@ -89,6 +90,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .manage(pty_state)
         .manage(config_state)
+        .manage(mcp_state)
         .invoke_handler(tauri::generate_handler![
             // PTY
             spawn_pty, write_pty, resize_pty, kill_pty,
@@ -99,8 +101,10 @@ pub fn run() {
             // AI
             check_providers, send_ai_query, get_ai_config, update_ai_config, get_budget_status,
             scan_ai_clis, list_ollama_models,
-            // MCP
+            // MCP config
             get_mcp_servers, save_mcp_servers, import_mcp_from_claude_config,
+            // MCP bridge
+            start_mcp_bridge, stop_mcp_bridge, get_mcp_tools, call_mcp_tool,
             // Chat persistence
             create_conversation, add_message, get_messages, list_conversations,
             save_session, restore_session,

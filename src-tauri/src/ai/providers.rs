@@ -15,7 +15,7 @@ pub(crate) fn execute(
     cwd: Option<&str>,
     history: &[(String, String)],
 ) -> Result<String> {
-    execute_streaming(query, provider, model, config, cwd, history, |_| {})
+    execute_streaming(query, provider, model, config, cwd, history, |_| {}, None)
 }
 
 /// Execute a query with streaming support.
@@ -29,17 +29,18 @@ pub(crate) fn execute_streaming(
     cwd: Option<&str>,
     history: &[(String, String)],
     on_chunk: impl Fn(&str),
+    mcp_tools_block: Option<&str>,
 ) -> Result<String> {
     let system = brain::load_system_prompt();
     let project_ctx = brain::load_project_context(cwd).unwrap_or_default();
     let env_ctx = cwd.map(brain::load_env_context).unwrap_or_default();
+    let mcp_block = mcp_tools_block.unwrap_or("");
 
-    let combined_ctx = match (env_ctx.is_empty(), project_ctx.is_empty()) {
-        (true, true) => String::new(),
-        (false, true) => env_ctx,
-        (true, false) => project_ctx,
-        (false, false) => format!("{env_ctx}\n\n{project_ctx}"),
-    };
+    let mut ctx_parts = Vec::new();
+    if !env_ctx.is_empty() { ctx_parts.push(env_ctx); }
+    if !project_ctx.is_empty() { ctx_parts.push(project_ctx); }
+    if !mcp_block.is_empty() { ctx_parts.push(mcp_block.to_string()); }
+    let combined_ctx = ctx_parts.join("\n\n");
 
     match provider {
         ProviderKind::Claude => {

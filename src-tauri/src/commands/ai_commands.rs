@@ -5,6 +5,7 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::ai::config;
 use crate::ai::database::Database;
+use crate::ai::mcp::{McpBridgeState, McpTool};
 use crate::ai::providers;
 use crate::ai::router;
 use crate::ai::types::{
@@ -136,7 +137,7 @@ pub(crate) async fn send_ai_query(
 
         let result = providers::execute_streaming(
             &query_owned, provider, &model, &config,
-            cwd_owned.as_deref(), &history_context, on_chunk,
+            cwd_owned.as_deref(), &history_context, on_chunk, None,
         );
         let duration_ms = start.elapsed().as_millis() as u64;
 
@@ -245,6 +246,45 @@ fn estimate_cost(provider: ProviderKind, output: &str) -> f64 {
 
 fn truncate(s: &str, max: usize) -> String {
     if s.len() <= max { s.to_string() } else { format!("{}...", &s[..max]) }
+}
+
+// ─── MCP Bridge Commands ────────────────────────────────────
+
+#[tauri::command]
+pub(crate) async fn start_mcp_bridge(
+    mcp: State<'_, McpBridgeState>,
+) -> Result<Vec<McpTool>, String> {
+    let mut bridge = mcp.lock().map_err(|_| "mcp mutex poisoned")?;
+    bridge.start_all().map_err(to_err)?;
+    Ok(bridge.all_tools())
+}
+
+#[tauri::command]
+pub(crate) async fn get_mcp_tools(
+    mcp: State<'_, McpBridgeState>,
+) -> Result<Vec<McpTool>, String> {
+    let bridge = mcp.lock().map_err(|_| "mcp mutex poisoned")?;
+    Ok(bridge.all_tools())
+}
+
+#[tauri::command]
+pub(crate) async fn call_mcp_tool(
+    server: String,
+    tool: String,
+    args: serde_json::Value,
+    mcp: State<'_, McpBridgeState>,
+) -> Result<String, String> {
+    let mut bridge = mcp.lock().map_err(|_| "mcp mutex poisoned")?;
+    bridge.call_tool(&server, &tool, &args).map_err(to_err)
+}
+
+#[tauri::command]
+pub(crate) async fn stop_mcp_bridge(
+    mcp: State<'_, McpBridgeState>,
+) -> Result<(), String> {
+    let mut bridge = mcp.lock().map_err(|_| "mcp mutex poisoned")?;
+    bridge.stop_all();
+    Ok(())
 }
 
 // ─── Auto-detection commands ────────────────────────────────
