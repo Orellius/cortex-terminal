@@ -80,6 +80,7 @@ pub fn run() {
             log::info!("Cortex v2 started — AI providers ready");
             Ok(())
         })
+        .plugin(tauri_plugin_notification::init())
         .manage(pty_state)
         .manage(config_state)
         .invoke_handler(tauri::generate_handler![

@@ -5,6 +5,7 @@ import { AiMessage, type ChatMessage } from "./AiMessage";
 import { AiChatInput } from "./AiChatInput";
 import { AiThinkingIndicator } from "./AiThinkingIndicator";
 import { MarkdownSidebar } from "./MarkdownSidebar";
+import { sendNotification, isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import watermark from "../../assets/cortex-watermark.png";
 
 interface AiStreamEvent {
@@ -75,6 +76,18 @@ export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
       const d = event.payload;
       if (d.pane_id !== paneId) return;
       if (!d.done) return;
+
+      // Notify if response took >10s and window not focused
+      if (d.duration_ms > 10000 && !document.hasFocus()) {
+        const preview = d.chunk.slice(0, 80).replace(/\n/g, " ");
+        isPermissionGranted().then((granted) => {
+          if (!granted) { requestPermission().catch(() => {}); return; }
+          sendNotification({
+            title: "Cortex — Response Ready",
+            body: preview,
+          });
+        }).catch(() => {});
+      }
 
       setThinking(null);
 
