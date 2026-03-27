@@ -15,6 +15,7 @@ export function TitleBar({ shortPath }: TitleBarProps): JSX.Element {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        background: "#010101",
         borderBottom: "none",
         userSelect: "none",
         // Leave space for macOS stoplight buttons (traffic lights)
