@@ -54,6 +54,46 @@
 
 ---
 
+## Supported Providers (26+)
+
+Cortex supports multiple AI providers through a unified routing layer. Most cloud providers use OpenAI-compatible SSE endpoints, making integration straightforward.
+
+### Cloud Providers
+
+| Provider | Models | Pricing (cheapest) | Auth | Streaming | Tools | Free Tier |
+|---|---|---|---|---|---|---|
+| **OpenAI** | GPT-5, GPT-4.1, o3, o4-mini | $0.25/1M in | API Key | SSE | Yes | Trial credits |
+| **Anthropic** | Claude Opus 4.6, Sonnet 4.6, Haiku 4.5 | $1.00/1M in | API Key | SSE | Yes | No |
+| **Google Gemini** | 2.5 Pro, 2.5 Flash, 2.5 Flash Lite | $0.10/1M in | API Key | SSE | Yes | Yes |
+| **Mistral** | Large 3, Small 3, Codestral, Nemo | $0.02/1M in | API Key | SSE | Yes | Rate-limited |
+| **DeepSeek** | V3, V4, R1 (reasoning) | $0.14/1M in | API Key | SSE | Yes | No |
+| **Groq** | Llama 4 Scout, gpt-oss-20B/120B | $0.05/1M in | API Key | SSE | Yes | Yes |
+| **xAI (Grok)** | Grok 4, Grok 4.1 Fast | $0.20/1M in | API Key | SSE | Yes | $25 credit |
+| **Together AI** | 200+ models (Llama, Qwen, Mistral) | $0.10/1M in | API Key | SSE | Yes | $1 credit |
+| **Cerebras** | Llama 8B/70B/405B (fastest inference) | $0.10/1M in | API Key | SSE | Limited | 24M tok/day |
+| **Cohere** | Command R+, Command A | $0.15/1M in | API Key | SSE | Yes | 1K req/mo |
+| **Perplexity** | Sonar, Sonar Pro (search-augmented) | $1.00/1M in | API Key | SSE | No | No |
+| **Fireworks AI** | 100+ open models, fast inference | $0.20/1M in | API Key | SSE | Yes | No |
+| **Amazon Bedrock** | Claude, Nova, Llama, Mistral | $0.035/1M in | AWS IAM | NDJSON | Yes | No |
+| **Azure OpenAI** | GPT-4.1, o3, o4-mini | $1.10/1M in | API Key | SSE | Yes | No |
+| **Alibaba (Qwen)** | Qwen Max, Plus, Turbo | $0.05/1M in | API Key | SSE | Yes | Yes (29 models) |
+| **AI21 (Jamba)** | Jamba 1.6 Mini, Large 1.7 (256K ctx) | $0.25/1M in | API Key | SSE | Yes | Trial credits |
+| **Reka AI** | Flash 3, Core (multimodal) | $0.20/1M in | API Key | SSE | Limited | No |
+| **Replicate** | 1000+ community models | Per GPU-sec | API Key | SSE | Rare | No |
+
+### Local Providers (free, private)
+
+| Provider | Endpoint | Streaming | Auth | Notes |
+|---|---|---|---|---|
+| **Ollama** (built-in) | localhost:11434 | NDJSON/SSE | None | 100+ models, vision, tools |
+| **LM Studio** | localhost:1234 | SSE | None | GUI-based, OpenAI + Anthropic compat |
+| **llama.cpp** | localhost:8080 | SSE | None | CPU-first, used by Ollama/LM Studio |
+| **vLLM** | localhost:8000 | SSE | None | Production-grade, multi-GPU |
+| **LocalAI** | localhost:8080 | SSE | None | 35+ backends, MCP native |
+| **Jan.ai** | localhost:1337 | SSE | None | GUI, also routes to cloud APIs |
+
+---
+
 ## What it is
 
 Cortex is a native desktop terminal that puts Claude and local Ollama models alongside a real shell in one window. You type in a single input. The router decides which model to call based on what you wrote. Responses stream token-by-token. All models share the same MCP tool bridge.
