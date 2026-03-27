@@ -3,13 +3,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ClaudeUsage } from "../types";
 
-interface ProviderStatus {
-  name: string;
-  kind: string;
-  available: boolean;
-  model: string;
-}
-
 interface BudgetStatus {
   spent_today: number;
   limit: number;
@@ -76,7 +69,6 @@ export function StatusBar({
   onOpenLauncher,
   onOpenSettings,
 }: StatusBarProps): JSX.Element {
-  const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [budget, setBudget] = useState<BudgetStatus>({ spent_today: 0, limit: 5, is_capped: false });
   const [activeModel, setActiveModel] = useState<{ provider: string; model: string } | null>(null);
   const [sessionElapsed, setSessionElapsed] = useState(0);
@@ -87,7 +79,6 @@ export function StatusBar({
   // Poll providers + budget
   useEffect(() => {
     const check = () => {
-      invoke<ProviderStatus[]>("check_providers").then(setProviders).catch(() => {});
       invoke<BudgetStatus>("get_budget_status").then(setBudget).catch(() => {});
     };
     check();
@@ -154,39 +145,7 @@ export function StatusBar({
       <ActionBtn onClick={onOpenLauncher} title="Cmd+K">Projects</ActionBtn>
       <ActionBtn onClick={onOpenSettings} title="Cmd+,">Settings</ActionBtn>
 
-      {/* Model badges */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-        {providers.map((p) => {
-          const color = PROVIDER_COLORS[p.kind] ?? "#52525b";
-          const icon = PROVIDER_ICONS[p.kind] ?? "○";
-          const isActive = activeModel?.provider === p.kind;
-          return (
-            <Badge
-              key={p.kind}
-              color={p.available ? color : "#27272a"}
-              borderColor={isActive ? color : p.available ? `${color}33` : "rgba(255,255,255,0.04)"}
-              title={`${p.name}: ${p.available ? p.model : "offline"}`}
-            >
-              <span
-                style={{
-                  width: "0.375rem",
-                  height: "0.375rem",
-                  borderRadius: "50%",
-                  background: p.available ? color : "#27272a",
-                  display: "inline-block",
-                  flexShrink: 0,
-                  // Pulse when active
-                  animation: isActive ? "pulse 1s infinite" : "none",
-                }}
-              />
-              <span style={{ fontSize: "0.625rem" }}>{icon}</span>
-              {p.name}
-            </Badge>
-          );
-        })}
-      </div>
-
-      {/* Active model indicator — shows which model is currently responding */}
+      {/* Active model indicator — only shows when a model is responding */}
       {activeModel && (
         <Badge
           color={PROVIDER_COLORS[activeModel.provider] ?? "#52525b"}
@@ -199,6 +158,7 @@ export function StatusBar({
           <span style={{ color: "#52525b", fontSize: "0.5625rem" }}>typing</span>
         </Badge>
       )}
+
 
       {/* Spacer */}
       <span style={{ flex: 1 }} />

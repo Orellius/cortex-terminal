@@ -5,27 +5,28 @@ use super::types::{CortexConfig, ProviderKind};
 pub(crate) fn route_query(query: &str, config: &CortexConfig) -> (ProviderKind, String) {
     let lower = query.to_lowercase();
 
-    // Explicit provider override: #claude:, #gemini:, #local:
+    // Explicit provider override: c: for Claude, l: for local
     if lower.starts_with("claude:") || lower.starts_with("c:") {
         return (ProviderKind::Claude, config.claude_model.clone());
     }
-    if lower.starts_with("gemini:") || lower.starts_with("g:") {
-        return (ProviderKind::Gemini, config.gemini_model.clone());
-    }
     if lower.starts_with("local:") || lower.starts_with("l:") {
         return (ProviderKind::Ollama, config.ollama_model.clone());
+    }
+    // Sonnet shortcut
+    if lower.starts_with("s:") {
+        return (ProviderKind::Claude, "sonnet".to_string());
     }
 
     let score = complexity_score(&lower);
 
     if score >= 5 {
-        // Complex: code generation, debugging, implementation
+        // Complex: code generation, debugging — use primary Claude model
         (ProviderKind::Claude, config.claude_model.clone())
     } else if score >= 3 {
-        // Medium: research, explanation, comparison
-        (ProviderKind::Gemini, config.gemini_model.clone())
+        // Medium: research, explanation — use Sonnet (faster, cheaper)
+        (ProviderKind::Claude, "sonnet".to_string())
     } else {
-        // Simple: short questions, formatting, quick lookups
+        // Simple: short questions, formatting, quick lookups — local
         (ProviderKind::Ollama, config.ollama_model.clone())
     }
 }

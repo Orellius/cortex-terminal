@@ -250,7 +250,7 @@ export function useAiInput(
 function detectProvider(query: string): string {
   const lower = query.toLowerCase();
   if (lower.startsWith("claude:") || lower.startsWith("c:")) return "claude";
-  if (lower.startsWith("gemini:") || lower.startsWith("g:")) return "gemini";
+  if (lower.startsWith("gemini:") || lower.startsWith("g:")) return "claude";
   if (lower.startsWith("local:") || lower.startsWith("l:")) return "local";
 
   const words = lower.split(/\s+/).map((w) => w.replace(/[^a-z0-9]/g, ""));
@@ -278,8 +278,8 @@ function detectProvider(query: string): string {
     "explain", "compare", "analyze", "research", "summarize",
     "alternative", "competitor", "trend", "review", "difference",
   ];
-  if (researchWords.some((kw) => words.includes(kw))) return "gemini";
-  if (/what is|how does|how to|pros and cons|difference between/.test(lower)) return "gemini";
+  if (researchWords.some((kw) => words.includes(kw))) return "claude";
+  if (/what is|how does|how to|pros and cons|difference between/.test(lower)) return "claude";
 
   return "ollama";
 }
