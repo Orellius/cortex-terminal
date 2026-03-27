@@ -25,9 +25,12 @@ interface AiChatViewProps {
   cwd: string;
   showSearch?: boolean;
   onCloseSearch?: () => void;
+  onOpenSettings?: () => void;
+  onOpenSearch?: () => void;
+  onOpenPalette?: () => void;
 }
 
-export function AiChatView({ paneId, isActive, cwd, showSearch, onCloseSearch }: AiChatViewProps): JSX.Element {
+export function AiChatView({ paneId, isActive, cwd, showSearch, onCloseSearch, onOpenSettings, onOpenSearch, onOpenPalette }: AiChatViewProps): JSX.Element {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [thinking, setThinking] = useState<{ provider: string; startTime: number } | null>(null);
   const [sidebarFile, setSidebarFile] = useState<string | null>(null);
@@ -401,27 +404,21 @@ export function AiChatView({ paneId, isActive, cwd, showSearch, onCloseSearch }:
         onSubmit={handleSubmit}
         disabled={thinking !== null}
         onSlashCommand={(cmd, _args) => {
-          if (cmd === "/clear") {
-            setMessages([]);
-          } else if (cmd === "/help") {
-            setMessages((prev) => [...prev, {
-              id: crypto.randomUUID(), role: "assistant", provider: "system", model: "cortex",
-              content: "Commands: /clear /settings /search /palette /help /model /budget\nPrefixes: ! shell · c: claude · s: sonnet · l: local",
-              timestamp: Date.now(),
-            }]);
-          } else if (cmd === "/model") {
-            setMessages((prev) => [...prev, {
-              id: crypto.randomUUID(), role: "assistant", provider: "system", model: "cortex",
-              content: "Routing: score 5+ → Claude, 3-4 → Sonnet, 0-2 → Local\nForce: c: s: l: prefixes",
-              timestamp: Date.now(),
-            }]);
-          } else {
-            setMessages((prev) => [...prev, {
-              id: crypto.randomUUID(), role: "assistant", provider: "system", model: "cortex",
-              content: `Unknown command: ${cmd}`,
-              timestamp: Date.now(),
-            }]);
+          const sysMsg = (content: string) => setMessages((prev) => [...prev, {
+            id: crypto.randomUUID(), role: "assistant" as const, provider: "system", model: "cortex", content, timestamp: Date.now(),
+          }]);
+          if (cmd === "/clear") { setMessages([]); }
+          else if (cmd === "/settings") { onOpenSettings?.(); }
+          else if (cmd === "/search") { onOpenSearch?.(); }
+          else if (cmd === "/palette") { onOpenPalette?.(); }
+          else if (cmd === "/help") { sysMsg("Commands: /clear /settings /search /palette /help /model /budget\nPrefixes: ! shell · c: claude · s: sonnet · l: local"); }
+          else if (cmd === "/model") { sysMsg("Routing: score 5+ → Claude, 3-4 → Sonnet, 0-2 → Local\nForce: c: s: l: prefixes"); }
+          else if (cmd === "/budget") {
+            invoke<{ spent_today: number; limit: number; is_capped: boolean }>("get_budget_status")
+              .then((b) => sysMsg(`Budget: $${b.spent_today.toFixed(4)} / $${b.limit.toFixed(2)}${b.is_capped ? " [CAPPED — local only]" : ""}`))
+              .catch(() => sysMsg("Budget: unavailable"));
           }
+          else { sysMsg(`Unknown command: ${cmd}`); }
         }}
       />
 

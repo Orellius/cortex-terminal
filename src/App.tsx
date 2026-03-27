@@ -14,6 +14,7 @@ import { ProjectLauncher } from "./components/ProjectLauncher";
 import { SettingsOverlay } from "./components/settings/SettingsOverlay";
 import { PasteHistory } from "./components/PasteHistory";
 import { CommandPalette, buildCommands } from "./components/CommandPalette";
+import { ToastContainer, useToasts } from "./components/Toast";
 import { usePasteHistory } from "./hooks/usePasteHistory";
 import type { ProjectEntry } from "./types";
 import type { Terminal } from "@xterm/xterm";
@@ -30,6 +31,7 @@ export function App(): JSX.Element {
     switchTab,
     updateTabCwd,
     updateTabTitle,
+    reorderTabs,
     splitPane,
     closePaneInTab,
     setActivePaneInTab,
@@ -70,6 +72,21 @@ export function App(): JSX.Element {
   const [showSettings, setShowSettings] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const pasteHistory = usePasteHistory();
+  const { toasts, addToast, dismissToast } = useToasts();
+
+  // Check for Ollama model updates on mount
+  useEffect(() => {
+    const checkUpdates = async () => {
+      try {
+        const models = await invoke<Array<{ name: string; size: string }>>( "list_ollama_models");
+        if (models.length > 0) {
+          // Simple version check — in production, compare with Ollama API for newer versions
+        }
+      } catch { /* Ollama not running */ }
+    };
+    const timer = setTimeout(checkUpdates, 5000); // Check 5s after launch
+    return () => clearTimeout(timer);
+  }, [addToast]);
 
   // Stable sentinel refs for keyboard hook (always point to active tab's refs)
   const activeTerminalRef = useRef<Terminal | null>(null);
@@ -211,6 +228,7 @@ export function App(): JSX.Element {
         onClose={closeTab}
         onSwitch={switchTab}
         onRename={updateTabTitle}
+        onReorder={reorderTabs}
       />
 
       <div
@@ -243,6 +261,9 @@ export function App(): JSX.Element {
               setCwd={(cwd) => updateTabCwd(tab.id, cwd)}
               showSearch={showSearch && tab.id === activeTabId}
               onCloseSearch={() => setShowSearch(false)}
+              onOpenSettings={() => setShowSettings(true)}
+              onOpenSearch={() => setShowSearch(true)}
+              onOpenPalette={() => setShowCommandPalette(true)}
             />
           </div>
         ))}
@@ -272,6 +293,7 @@ export function App(): JSX.Element {
           onClear={pasteHistory.clearHistory}
         />
       )}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {showCommandPalette && (
         <CommandPalette
           commands={buildCommands({

@@ -10,6 +10,7 @@ interface UseTabsResult {
   switchTab: (id: string) => void;
   updateTabTitle: (id: string, title: string) => void;
   updateTabCwd: (id: string, cwd: string) => void;
+  reorderTabs: (fromIndex: number, toIndex: number) => void;
   splitPane: (direction: SplitDirection) => void;
   closePaneInTab: (tabId: string, paneId: string) => void;
   setActivePaneInTab: (tabId: string, paneId: string) => void;
@@ -99,6 +100,15 @@ export function useTabs(homeDir: string): UseTabsResult {
     );
   }, []);
 
+  const reorderTabs = useCallback((fromIndex: number, toIndex: number) => {
+    setTabs((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }, []);
+
   /** Split the active pane in the active tab */
   const splitPane = useCallback(
     (direction: SplitDirection) => {
@@ -160,6 +170,7 @@ export function useTabs(homeDir: string): UseTabsResult {
     switchTab,
     updateTabTitle,
     updateTabCwd,
+    reorderTabs,
     splitPane,
     closePaneInTab,
     setActivePaneInTab,

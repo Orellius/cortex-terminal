@@ -12,6 +12,7 @@ interface TabBarProps {
   onClose: (id: string) => void;
   onSwitch: (id: string) => void;
   onRename?: (id: string, title: string) => void;
+  onReorder?: (fromIndex: number, toIndex: number) => void;
 }
 
 function shortenPath(fullPath: string, homeDir: string): string {
@@ -29,9 +30,12 @@ export function TabBar({
   onClose,
   onSwitch,
   onRename,
+  onReorder,
 }: TabBarProps): JSX.Element {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const editRef = useRef<HTMLInputElement>(null);
 
@@ -74,6 +78,16 @@ export function TabBar({
         return (
           <div
             key={tab.id}
+            draggable={editingId !== tab.id}
+            onDragStart={() => setDragIndex(index)}
+            onDragOver={(e) => { e.preventDefault(); setDragOverIndex(index); }}
+            onDragEnd={() => {
+              if (dragIndex !== null && dragOverIndex !== null && dragIndex !== dragOverIndex) {
+                onReorder?.(dragIndex, dragOverIndex);
+              }
+              setDragIndex(null);
+              setDragOverIndex(null);
+            }}
             onMouseEnter={() => setHoveredId(tab.id)}
             onMouseLeave={() => setHoveredId(null)}
             onClick={() => onSwitch(tab.id)}
@@ -83,8 +97,10 @@ export function TabBar({
               gap: "0.375rem",
               padding: "0.25rem 0.75rem",
               margin: "0.25rem 0.125rem",
-              cursor: "pointer",
-              borderRadius: isActive ? "0.375rem" : "0.375rem",
+              cursor: "grab",
+              opacity: dragIndex === index ? 0.4 : 1,
+              borderRadius: "0.375rem",
+              borderLeft: dragOverIndex === index && dragIndex !== null && dragIndex !== index ? "2px solid #05a0ef" : "2px solid transparent",
               background: isActive
                 ? "rgba(255, 255, 255, 0.06)"
                 : isHovered

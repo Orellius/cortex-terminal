@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, type JSX } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Cpu, Plug, GitBranch, Wallet, Shield, Zap, Keyboard, Info } from "lucide-react";
+import { Cpu, Plug, GitBranch, Wallet, Shield, Zap, Paintbrush, Keyboard, Info } from "lucide-react";
 import { ProvidersTab } from "./ProvidersTab";
 import { ModelsTab } from "./ModelsTab";
 import { BudgetTab } from "./BudgetTab";
 import { PermissionsTab } from "./PermissionsTab";
 import { McpTab } from "./McpTab";
+import { ThemeTab } from "./ThemeTab";
 import { AboutTab } from "./AboutTab";
 
 interface CortexConfig {
@@ -17,7 +18,7 @@ interface CortexConfig {
   daily_budget_usd: number;
 }
 
-type SettingsSection = "models" | "providers" | "routing" | "budget" | "permissions" | "mcp" | "shortcuts" | "about";
+type SettingsSection = "models" | "providers" | "routing" | "budget" | "permissions" | "mcp" | "theme" | "shortcuts" | "about";
 
 interface NavItem {
   id: SettingsSection;
@@ -35,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "budget", label: "Budget", icon: <Wallet {...ICON_PROPS} />, group: "ai" },
   { id: "permissions", label: "Permissions", icon: <Shield {...ICON_PROPS} />, group: "system" },
   { id: "mcp", label: "MCP Servers", icon: <Zap {...ICON_PROPS} />, group: "system" },
+  { id: "theme", label: "Appearance", icon: <Paintbrush {...ICON_PROPS} />, group: "system" },
   { id: "shortcuts", label: "Shortcuts", icon: <Keyboard {...ICON_PROPS} />, group: "system" },
   { id: "about", label: "About", icon: <Info {...ICON_PROPS} />, group: "system" },
 ];
@@ -133,6 +135,8 @@ export function SettingsOverlay({ onClose }: SettingsOverlayProps): JSX.Element 
             <PermissionsTab />
           ) : active === "mcp" ? (
             <McpTab />
+          ) : active === "theme" ? (
+            <ThemeTab />
           ) : active === "shortcuts" ? (
             <ShortcutsInfo />
           ) : (
