@@ -16,33 +16,19 @@
 
 ---
 
-### Welcome
+## Screenshots
 
-![Welcome screen](docs/screenshots/01-welcome.png)
-
-### Context-aware AI
-
-Ask about your project. Cortex reads your cwd, git status, CLAUDE.md, and file tree automatically.
-
-![Context-aware response](docs/screenshots/02-context-aware.png)
-
-### Nemotron local model response
-
-Local models are context-aware too. Nemotron reads your CLAUDE.md, detects the stack, and lists active projects.
-
-![Nemotron response](docs/screenshots/04-nemotron-response.png)
-
-### Shell + AI in one flow
-
-Run shell commands inline with `!` prefix. AI responses and shell output live in the same terminal stream.
-
-![Shell execution](docs/screenshots/03-shell-exec.png)
-
-### Slash commands + rich markdown
-
-`/help` shows available commands. AI responses render markdown tables, bold text, code blocks, and LaTeX equations.
-
-![Rich markdown](docs/screenshots/05-rich-markdown.png)
+| | |
+|---|---|
+| **Welcome** | **Context-aware AI** |
+| ![Welcome](docs/screenshots/01-welcome.png) | ![Context](docs/screenshots/02-context-aware.png) |
+| ASCII welcome, unified black UI, session tabs | Reads cwd, git status, CLAUDE.md, file tree |
+| **Local model (Nemotron)** | **Shell + AI in one flow** |
+| ![Nemotron](docs/screenshots/04-nemotron-response.png) | ![Shell](docs/screenshots/03-shell-exec.png) |
+| Local models are context-aware too | `!` prefix runs commands inline |
+| **Slash commands + markdown** | **Rich markdown rendering** |
+| ![Slash](docs/screenshots/05-rich-markdown.png) | ![Markdown](docs/screenshots/06-markdown-sidebar.png) |
+| `/help`, tables, code blocks, LaTeX | Headers, bullets, inline code, bold |
 
 ---
 
@@ -224,7 +210,7 @@ For AI features (optional but recommended):
 ### Build from source
 
 ```bash
-git clone https://github.com/Orellius/cortex
+git clone https://github.com/Orellius/cortex-terminal
 cd cortex
 pnpm install
 cargo tauri dev
