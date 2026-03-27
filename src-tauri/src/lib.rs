@@ -12,7 +12,8 @@ use ai::config;
 use ai::database::Database;
 use ai::types::CortexConfig;
 use commands::ai_commands::{
-    call_mcp_tool, check_providers, get_ai_config, get_budget_status, get_mcp_servers,
+    call_mcp_tool, check_providers, get_active_providers, get_ai_config, get_budget_status,
+    get_mcp_servers, get_provider_registry, save_provider_registry, send_to_provider,
     get_mcp_tools, import_mcp_from_claude_config, import_mcp_from_cursor_config,
     list_ollama_models, save_mcp_servers,
     scan_ai_clis, send_ai_query, start_mcp_bridge, stop_mcp_bridge, update_ai_config,
@@ -110,6 +111,8 @@ pub fn run() {
             scan_ai_clis, list_ollama_models,
             // MCP config
             get_mcp_servers, save_mcp_servers, import_mcp_from_claude_config, import_mcp_from_cursor_config,
+            // Provider registry
+            get_provider_registry, get_active_providers, save_provider_registry, send_to_provider,
             // MCP bridge
             start_mcp_bridge, stop_mcp_bridge, get_mcp_tools, call_mcp_tool,
             // Chat persistence

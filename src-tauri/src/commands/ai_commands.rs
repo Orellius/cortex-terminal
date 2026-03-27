@@ -7,6 +7,7 @@ use crate::ai::config;
 use crate::ai::database::Database;
 use crate::ai::mcp::{McpBridgeState, McpTool};
 use crate::ai::providers;
+use crate::ai::registry::{self, ProviderEntry, ProviderRegistry};
 use crate::ai::router;
 use crate::ai::types::{
     AiStreamEvent, BudgetStatus, CortexConfig, CostEntry, ProviderKind, ProviderStatus,
@@ -244,6 +245,84 @@ pub(crate) async fn import_mcp_from_claude_config() -> Result<Vec<config::McpSer
     tokio::task::spawn_blocking(|| config::import_mcp_from_claude().map_err(to_err))
         .await
         .map_err(|e| format!("task failed: {e}"))?
+}
+
+// ─── Provider Registry Commands ─────────────────────────────
+
+#[tauri::command]
+pub(crate) async fn get_provider_registry() -> Result<Vec<ProviderEntry>, String> {
+    let reg = ProviderRegistry::load().map_err(to_err)?;
+    Ok(reg.providers)
+}
+
+#[tauri::command]
+pub(crate) async fn get_active_providers() -> Result<Vec<ProviderEntry>, String> {
+    let reg = ProviderRegistry::load().map_err(to_err)?;
+    Ok(reg.active_providers().into_iter().cloned().collect())
+}
+
+#[tauri::command]
+pub(crate) async fn save_provider_registry(providers: Vec<ProviderEntry>) -> Result<(), String> {
+    let reg = ProviderRegistry { providers };
+    reg.save().map_err(to_err)
+}
+
+/// Send a query to any registered provider by name
+#[tauri::command]
+pub(crate) async fn send_to_provider(
+    provider_name: String,
+    model: String,
+    query: String,
+    pane_id: String,
+    app: AppHandle,
+) -> Result<(), String> {
+    let reg = ProviderRegistry::load().map_err(to_err)?;
+    let provider = reg.get(&provider_name)
+        .ok_or_else(|| format!("provider '{}' not found", provider_name))?
+        .clone();
+
+    let chunk_app = app.clone();
+    let chunk_pane = pane_id.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let start = std::time::Instant::now();
+
+        let on_chunk = |text: &str| {
+            let _ = chunk_app.emit("cortex:ai:stream", serde_json::json!({
+                "pane_id": chunk_pane,
+                "provider": provider.name,
+                "model": model,
+                "chunk": text,
+                "done": false,
+                "cost": 0.0,
+                "duration_ms": 0,
+                "verified": true,
+            }));
+        };
+
+        let result = registry::stream_openai_compat(
+            &provider, &model, "", &[], &query, &on_chunk,
+        );
+
+        let duration_ms = start.elapsed().as_millis() as u64;
+        let (content, cost) = match result {
+            Ok(output) => (output, 0.0),
+            Err(e) => (format!("error: {e}"), 0.0),
+        };
+
+        let _ = app.emit("cortex:ai:stream", serde_json::json!({
+            "pane_id": pane_id,
+            "provider": provider.name,
+            "model": model,
+            "chunk": content,
+            "done": true,
+            "cost": cost,
+            "duration_ms": duration_ms,
+            "verified": true,
+        }));
+    });
+
+    Ok(())
 }
 
 #[tauri::command]

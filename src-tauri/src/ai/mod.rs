@@ -4,6 +4,7 @@ pub(crate) mod config;
 pub(crate) mod database;
 pub(crate) mod mcp;
 pub(crate) mod providers;
+pub(crate) mod registry;
 pub(crate) mod router;
 pub(crate) mod types;
 pub(crate) mod verification;
