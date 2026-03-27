@@ -12,6 +12,8 @@ import { SplitPaneLayout } from "./components/SplitPaneLayout";
 import { StatusBar } from "./components/StatusBar";
 import { ProjectLauncher } from "./components/ProjectLauncher";
 import { SettingsOverlay } from "./components/settings/SettingsOverlay";
+import { PasteHistory } from "./components/PasteHistory";
+import { usePasteHistory } from "./hooks/usePasteHistory";
 import type { ProjectEntry } from "./types";
 import type { Terminal } from "@xterm/xterm";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -63,6 +65,7 @@ export function App(): JSX.Element {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const pasteHistory = usePasteHistory();
 
   // Stable sentinel refs for keyboard hook (always point to active tab's refs)
   const activeTerminalRef = useRef<Terminal | null>(null);
@@ -170,6 +173,7 @@ export function App(): JSX.Element {
     toggleSettings,
     splitVertical: () => splitPane("vertical"),
     splitHorizontal: () => splitPane("horizontal"),
+    togglePasteHistory: pasteHistory.toggleHistory,
   });
 
   const { branch, usage } = useStatusPoll(activeTab?.cwd ?? "");
@@ -250,6 +254,14 @@ export function App(): JSX.Element {
       )}
       {showSettings && (
         <SettingsOverlay onClose={() => setShowSettings(false)} />
+      )}
+      {pasteHistory.showHistory && (
+        <PasteHistory
+          history={pasteHistory.history}
+          onSelect={() => {}}
+          onClose={pasteHistory.closeHistory}
+          onClear={pasteHistory.clearHistory}
+        />
       )}
     </div>
   );

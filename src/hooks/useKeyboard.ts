@@ -16,6 +16,7 @@ interface KeyboardCallbacks {
   toggleSettings: () => void;
   splitVertical: () => void;
   splitHorizontal: () => void;
+  togglePasteHistory: () => void;
 }
 
 export function useKeyboard({
@@ -32,10 +33,18 @@ export function useKeyboard({
   toggleSettings,
   splitVertical,
   splitHorizontal,
+  togglePasteHistory,
 }: KeyboardCallbacks): void {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!e.metaKey) return;
+
+      // Cmd+Shift+H = paste history
+      if (e.key === "h" && e.shiftKey) {
+        e.preventDefault();
+        togglePasteHistory();
+        return;
+      }
 
       // Cmd+D = split vertical, Cmd+Shift+D = split horizontal
       if (e.key === "d" || e.key === "D") {
@@ -106,5 +115,6 @@ export function useKeyboard({
     toggleSettings,
     splitVertical,
     splitHorizontal,
+    togglePasteHistory,
   ]);
 }
