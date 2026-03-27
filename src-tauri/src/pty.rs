@@ -51,8 +51,8 @@ impl PtyManager {
         }
     }
 
-    /// Spawns `/bin/zsh` in `cwd`, starts a background reader thread that
-    /// emits `pty:output:{pane_id}` events, and stores the session.
+    /// Spawns the user's default shell in `cwd`, starts a background reader
+    /// thread that emits `pty:output:{pane_id}` events, and stores the session.
     ///
     /// Returns an error if a session with the same `pane_id` already exists,
     /// if the working directory does not exist, or if PTY allocation fails.
@@ -77,7 +77,8 @@ impl PtyManager {
             })
             .context("failed to open PTY pair")?;
 
-        let mut cmd = CommandBuilder::new("/bin/zsh");
+        let shell = default_shell();
+        let mut cmd = CommandBuilder::new(&shell);
         cmd.cwd(cwd);
         // Provide a sane minimal environment.
         cmd.env("TERM", "xterm-256color");
@@ -88,7 +89,7 @@ impl PtyManager {
         if let Ok(path) = std::env::var("PATH") {
             cmd.env("PATH", path);
         }
-        if let Ok(home) = std::env::var("HOME") {
+        if let Ok(home) = home_dir_string() {
             cmd.env("HOME", home);
         }
         if let Ok(user) = std::env::var("USER") {
@@ -98,7 +99,7 @@ impl PtyManager {
         let child = master
             .slave
             .spawn_command(cmd)
-            .context("failed to spawn /bin/zsh")?;
+            .with_context(|| format!("failed to spawn shell: {shell}"))?;
 
         // Obtain a reader *before* storing the session so we can move it into
         // the thread without holding the manager lock during I/O.
@@ -247,4 +248,35 @@ fn reader_loop(
             pane_id: pane_id.clone(),
         },
     );
+}
+
+// ---------------------------------------------------------------------------
+// Platform helpers
+// ---------------------------------------------------------------------------
+
+/// Returns the user's default shell binary.
+/// Unix: reads $SHELL, falls back to /bin/sh.
+/// Windows: reads %COMSPEC%, falls back to cmd.exe.
+fn default_shell() -> String {
+    #[cfg(unix)]
+    {
+        std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
+    }
+    #[cfg(windows)]
+    {
+        std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string())
+    }
+}
+
+/// Returns the user's home directory as a String.
+/// Unix: $HOME. Windows: $USERPROFILE.
+fn home_dir_string() -> std::result::Result<String, std::env::VarError> {
+    #[cfg(unix)]
+    {
+        std::env::var("HOME")
+    }
+    #[cfg(windows)]
+    {
+        std::env::var("USERPROFILE")
+    }
 }

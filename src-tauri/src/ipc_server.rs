@@ -1,18 +1,15 @@
-//! Local Unix socket IPC server for the `cortex` CLI bridge.
-//! Listens on ~/.cortex/cortex.sock for commands from the CLI.
+//! Local IPC server for the `cortex` CLI bridge.
+//! Unix: listens on ~/.cortex/cortex.sock (Unix domain socket).
+//! Windows: listens on a named pipe \\.\pipe\cortex-ipc.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::UnixListener;
 
 use crate::ai::database::Database;
 
 /// Start the IPC server on a background task.
-/// Listens for single-line JSON commands on ~/.cortex/cortex.sock.
 pub fn start_ipc_server(app: AppHandle, db: Arc<Database>) {
     tauri::async_runtime::spawn(async move {
         if let Err(e) = run_server(app, db).await {
@@ -21,13 +18,18 @@ pub fn start_ipc_server(app: AppHandle, db: Arc<Database>) {
     });
 }
 
-fn socket_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
-    PathBuf::from(home).join(".cortex").join("cortex.sock")
-}
+// ---------------------------------------------------------------------------
+// Unix: domain socket at ~/.cortex/cortex.sock
+// ---------------------------------------------------------------------------
 
-async fn run_server(app: AppHandle, _db: Arc<Database>) -> Result<()> {
-    let path = socket_path();
+#[cfg(unix)]
+async fn run_server(app: AppHandle, _db: Arc<Database>) -> anyhow::Result<()> {
+    use std::path::PathBuf;
+    use anyhow::Context;
+    use tokio::net::UnixListener;
+
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    let path = PathBuf::from(home).join(".cortex").join("cortex.sock");
 
     // Remove stale socket
     let _ = std::fs::remove_file(&path);
@@ -57,6 +59,45 @@ async fn run_server(app: AppHandle, _db: Arc<Database>) -> Result<()> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Windows: named pipe at \\.\pipe\cortex-ipc
+// ---------------------------------------------------------------------------
+
+#[cfg(windows)]
+async fn run_server(app: AppHandle, _db: Arc<Database>) -> anyhow::Result<()> {
+    use anyhow::Context;
+    use tokio::net::windows::named_pipe::{ServerOptions, PipeMode};
+
+    let pipe_name = r"\\.\pipe\cortex-ipc";
+    log::info!("IPC server listening on {pipe_name}");
+
+    loop {
+        let server = ServerOptions::new()
+            .pipe_mode(PipeMode::Byte)
+            .first_pipe_instance(false)
+            .create(pipe_name)
+            .context("create named pipe")?;
+
+        server.connect().await.context("accept pipe connection")?;
+
+        let app = app.clone();
+        tokio::spawn(async move {
+            let (reader, mut writer) = tokio::io::split(server);
+            let mut lines = BufReader::new(reader).lines();
+
+            while let Ok(Some(line)) = lines.next_line().await {
+                let response = handle_command(&line, &app).await;
+                let _ = writer.write_all(response.as_bytes()).await;
+                let _ = writer.write_all(b"\n").await;
+            }
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Command handler (shared across platforms)
+// ---------------------------------------------------------------------------
+
 async fn handle_command(line: &str, app: &AppHandle) -> String {
     let parsed: serde_json::Value = match serde_json::from_str(line) {
         Ok(v) => v,
@@ -71,7 +112,6 @@ async fn handle_command(line: &str, app: &AppHandle) -> String {
             if query.is_empty() {
                 return r#"{"error":"empty query"}"#.to_string();
             }
-            // Emit event to frontend to process the query
             let _ = app.emit("cortex:cli:ask", serde_json::json!({ "query": query }));
             r#"{"status":"sent"}"#.to_string()
         }

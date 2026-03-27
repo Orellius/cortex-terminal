@@ -82,8 +82,9 @@ pub(crate) async fn execute_shell(
         .unwrap_or_else(|| "/tmp".to_string());
 
     tokio::task::spawn_blocking(move || {
-        let output = Command::new("/bin/zsh")
-            .args(["-c", &command])
+        let (shell, flag) = default_shell_with_flag();
+        let output = Command::new(&shell)
+            .args([&flag, &command])
             .current_dir(&work_dir)
             .output()
             .map_err(|e| format!("shell error: {e}"))?;
@@ -111,7 +112,7 @@ pub(crate) struct ShellResult {
 /// Returns the user's home directory path.
 #[tauri::command]
 pub(crate) async fn get_home_dir() -> Result<String, String> {
-    std::env::var("HOME").map_err(|e| format!("HOME not set: {e}"))
+    home_dir_string().ok_or_else(|| "home directory not found".to_string())
 }
 
 /// Returns the directory Cortex was launched from (process cwd).
@@ -257,7 +258,7 @@ pub(crate) async fn read_file_content(path: String) -> Result<String, String> {
 
     // Expand ~ to home dir
     let expanded = if path.starts_with("~/") {
-        let home = std::env::var("HOME").map_err(|_| "HOME not set")?;
+        let home = home_dir_string().ok_or("home directory not found")?;
         Path::new(&home).join(&path[2..])
     } else {
         p.to_path_buf()
@@ -319,7 +320,7 @@ pub(crate) async fn get_recent_projects() -> Result<Vec<ProjectEntry>, String> {
 }
 
 fn recents_file() -> std::path::PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    let home = home_dir_string().unwrap_or_else(|| "/tmp".to_string());
     Path::new(&home).join(".cortex").join("recents.json")
 }
 
@@ -336,7 +337,7 @@ fn load_recents() -> Vec<String> {
 /// nested repos. Sorted alphabetically.
 #[tauri::command]
 pub(crate) async fn list_projects() -> Result<Vec<ProjectEntry>, String> {
-    let home = std::env::var("HOME").map_err(|e| format!("HOME not set: {e}"))?;
+    let home = home_dir_string().ok_or("home directory not found")?;
     // Check env var first, then common locations
     let projects_dir = std::env::var("CORTEX_PROJECTS_DIR")
         .map(std::path::PathBuf::from)
@@ -413,4 +414,36 @@ pub(crate) async fn list_projects() -> Result<Vec<ProjectEntry>, String> {
     entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
 
     Ok(entries)
+}
+
+// ---------------------------------------------------------------------------
+// Platform helpers
+// ---------------------------------------------------------------------------
+
+/// Returns the user's home directory as a String.
+/// Unix: $HOME. Windows: $USERPROFILE.
+fn home_dir_string() -> Option<String> {
+    #[cfg(unix)]
+    {
+        std::env::var("HOME").ok()
+    }
+    #[cfg(windows)]
+    {
+        std::env::var("USERPROFILE").ok()
+    }
+}
+
+/// Returns the default shell binary and its command-execution flag.
+/// Unix: ($SHELL, "-c"). Windows: (%COMSPEC%, "/C").
+fn default_shell_with_flag() -> (String, String) {
+    #[cfg(unix)]
+    {
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+        (shell, "-c".to_string())
+    }
+    #[cfg(windows)]
+    {
+        let shell = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string());
+        (shell, "/C".to_string())
+    }
 }
