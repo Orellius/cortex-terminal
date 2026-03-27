@@ -11,6 +11,7 @@ import { TabTerminal } from "./components/TabTerminal";
 import { AiTabTerminal } from "./components/AiTabTerminal";
 import { StatusBar } from "./components/StatusBar";
 import { ProjectLauncher } from "./components/ProjectLauncher";
+import { SettingsOverlay } from "./components/settings/SettingsOverlay";
 import type { ProjectEntry } from "./types";
 import type { Terminal } from "@xterm/xterm";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -37,10 +38,11 @@ export function App(): JSX.Element {
     new Map()
   );
 
-  // Launcher / search state
+  // Launcher / search / settings state
   const [showLauncher, setShowLauncher] = useState(false);
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [showSearch, setShowSearch] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Stable sentinel refs for keyboard hook (always point to active tab's refs)
   const activeTerminalRef = useRef<Terminal | null>(null);
@@ -110,6 +112,10 @@ export function App(): JSX.Element {
     setShowSearch((prev) => !prev);
   }, []);
 
+  const toggleSettings = useCallback(() => {
+    setShowSettings((prev) => !prev);
+  }, []);
+
   const addAiTab = useCallback(() => {
     addTab("ai");
   }, [addTab]);
@@ -141,6 +147,7 @@ export function App(): JSX.Element {
     addTab: addAiTab,
     closeTab: closeActiveTab,
     switchTabByIndex,
+    toggleSettings,
   });
 
   const { branch, usage } = useStatusPoll(activeTab?.cwd ?? "");
@@ -218,6 +225,9 @@ export function App(): JSX.Element {
           onSelect={selectProject}
           onClose={closeLauncher}
         />
+      )}
+      {showSettings && (
+        <SettingsOverlay onClose={() => setShowSettings(false)} />
       )}
     </div>
   );

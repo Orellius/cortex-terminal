@@ -18,10 +18,10 @@ pub(crate) fn route_query(query: &str, config: &CortexConfig) -> (ProviderKind, 
 
     let score = complexity_score(&lower);
 
-    if score >= 7 {
+    if score >= 5 {
         // Complex: code generation, debugging, implementation
         (ProviderKind::Claude, config.claude_model.clone())
-    } else if score >= 4 {
+    } else if score >= 3 {
         // Medium: research, explanation, comparison
         (ProviderKind::Gemini, config.gemini_model.clone())
     } else {
@@ -30,47 +30,77 @@ pub(crate) fn route_query(query: &str, config: &CortexConfig) -> (ProviderKind, 
     }
 }
 
-/// Score query complexity 0-10 based on keyword signals.
+/// Score query complexity 0-10 based on word-level signals.
+/// Uses individual word matching — "fix the bug" matches "fix" and "bug" separately.
 fn complexity_score(query: &str) -> u8 {
     let mut score: u8 = 0;
+    let words: Vec<&str> = query.split_whitespace().collect();
 
     // Code execution signals → high complexity (Claude)
-    let code_keywords = [
-        "implement", "build", "write code", "fix bug", "debug", "refactor",
-        "create file", "add feature", "deploy", "publish", "commit", "push",
-        "cargo", "npm", "git", "test", "compile", "migration",
+    // Individual words: any single match = strong code signal
+    let code_words = [
+        "implement", "build", "fix", "debug", "refactor", "deploy", "publish",
+        "commit", "compile", "migration", "scaffold", "architect", "optimize",
     ];
-    for kw in code_keywords {
-        if query.contains(kw) {
-            score = score.saturating_add(3);
+    for word in &code_words {
+        if words.iter().any(|w| w.trim_matches(|c: char| !c.is_alphanumeric()) == *word) {
+            score = score.saturating_add(5);
+            break; // One code word is enough for Claude
+        }
+    }
+
+    // Secondary code signals — boost if already in code territory
+    let code_context_words = [
+        "bug", "error", "crash", "feature", "function", "component", "endpoint",
+        "api", "route", "schema", "query", "mutation", "test", "tests",
+        "cargo", "npm", "git", "rust", "typescript", "react", "tauri",
+    ];
+    for word in &code_context_words {
+        if words.iter().any(|w| w.trim_matches(|c: char| !c.is_alphanumeric()) == *word) {
+            score = score.saturating_add(2);
+            break;
         }
     }
 
     // Research signals → medium complexity (Gemini)
-    let research_keywords = [
-        "explain", "compare", "what is", "how does", "analyze", "research",
-        "find", "search", "alternative", "competitor", "trend", "review",
-        "summarize", "pros and cons", "difference between",
+    let research_words = [
+        "explain", "compare", "analyze", "research", "summarize",
+        "alternative", "competitor", "trend", "review", "difference",
     ];
-    for kw in research_keywords {
-        if query.contains(kw) {
-            score = score.saturating_add(2);
+    for word in &research_words {
+        if words.iter().any(|w| w.trim_matches(|c: char| !c.is_alphanumeric()) == *word) {
+            score = score.saturating_add(3);
+            break;
         }
     }
 
-    // Code context signals → bump to Claude
+    // Phrase-level research signals (multi-word patterns)
+    let research_phrases = ["what is", "how does", "how to", "pros and cons", "difference between"];
+    for phrase in &research_phrases {
+        if query.contains(phrase) {
+            score = score.saturating_add(3);
+            break;
+        }
+    }
+
+    // Code syntax signals → strong Claude indicator
     if query.contains("```") || query.contains("fn ") || query.contains("function ")
-        || query.contains("class ") || query.contains("import ")
+        || query.contains("class ") || query.contains("import ") || query.contains("async ")
+        || query.contains("pub ") || query.contains("struct ") || query.contains("const ")
     {
-        score = score.saturating_add(4);
+        score = score.saturating_add(5);
+    }
+
+    // File extension references → code context
+    if query.contains(".rs") || query.contains(".ts") || query.contains(".tsx")
+        || query.contains(".js") || query.contains(".py") || query.contains(".toml")
+    {
+        score = score.saturating_add(3);
     }
 
     // Long query → likely complex
-    let word_count = query.split_whitespace().count();
-    if word_count > 50 {
+    if words.len() > 50 {
         score = score.saturating_add(2);
-    } else if word_count < 10 {
-        // Short → likely simple, keep score low
     }
 
     score.min(10)

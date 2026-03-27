@@ -4,7 +4,8 @@ import { FitAddon } from "@xterm/addon-fit";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { TERMINAL_THEME } from "../constants";
-import { formatAiResponse, formatThinking } from "../ai/formatter";
+import { formatAiResponse } from "../ai/formatter";
+import { startThinking } from "../ai/thinking";
 import { RESET, BOLD, DIM } from "../ai/constants";
 
 interface AiStreamEvent {
@@ -37,6 +38,8 @@ export function useAiTerminal(
   const terminalRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const lineBuffer = useRef("");
+  const conversationId = useRef<string | null>(null);
+  const thinkingAnim = useRef<{ stop: () => void } | null>(null);
 
   useEffect(() => {
     if (!isActive) {
@@ -81,6 +84,11 @@ export function useAiTerminal(
     terminalRef.current = term;
     fitRef.current = fit;
 
+    // Create or resume conversation
+    invoke<string>("create_conversation", { tabId: paneId })
+      .then((id) => { conversationId.current = id; })
+      .catch(() => {});
+
     // Welcome message
     term.write(`${BOLD}Cortex AI Terminal${RESET}\r\n`);
     term.write(`${DIM}Type naturally. Models route automatically.${RESET}\r\n`);
@@ -118,12 +126,32 @@ export function useAiTerminal(
 
           // AI query — route to ensemble
           const provider = detectProvider(line);
-          term.write(formatThinking(provider));
+          thinkingAnim.current?.stop();
+          thinkingAnim.current = startThinking(term, provider);
+
+          // Persist user message
+          if (conversationId.current) {
+            invoke("add_message", {
+              msg: {
+                conversation_id: conversationId.current,
+                role: "user",
+                content: line,
+                provider: null,
+                model: null,
+                cost_usd: 0,
+                duration_ms: 0,
+                verified: true,
+                created_at: new Date().toISOString(),
+              },
+            }).catch(() => {});
+          }
 
           invoke("send_ai_query", { query: line, paneId }).catch(
             (err: unknown) => {
+              thinkingAnim.current?.stop();
+              thinkingAnim.current = null;
               const msg = err instanceof Error ? err.message : String(err);
-              term.write(`\r\n\x1b[31merror: ${msg}${RESET}\r\n`);
+              term.write(`\x1b[31merror: ${msg}${RESET}\r\n`);
               writePrompt(term);
             }
           );
@@ -170,7 +198,8 @@ export function useAiTerminal(
       const d = event.payload;
       if (d.pane_id !== paneId) return;
       if (d.done) {
-        term.write("\x1b[2K\r"); // Clear thinking line
+        thinkingAnim.current?.stop();
+        thinkingAnim.current = null;
         const formatted = formatAiResponse({
           provider: d.provider,
           model: d.model,
@@ -181,6 +210,23 @@ export function useAiTerminal(
         });
         term.write(formatted);
         writePrompt(term);
+
+        // Persist assistant response
+        if (conversationId.current) {
+          invoke("add_message", {
+            msg: {
+              conversation_id: conversationId.current,
+              role: "assistant",
+              content: d.chunk,
+              provider: d.provider,
+              model: d.model,
+              cost_usd: d.cost,
+              duration_ms: d.duration_ms,
+              verified: d.verified,
+              created_at: new Date().toISOString(),
+            },
+          }).catch(() => {});
+        }
       }
     }).then((fn) => { unlistenStream = fn; });
 
@@ -193,6 +239,7 @@ export function useAiTerminal(
     observer.observe(el);
 
     return () => {
+      thinkingAnim.current?.stop();
       observer.disconnect();
       dataDisposable.dispose();
       unlistenStream?.();
@@ -206,7 +253,11 @@ export function useAiTerminal(
 }
 
 function writePrompt(term: Terminal): void {
-  term.write(`\x1b[36mcortex\x1b[0m \x1b[2m>\x1b[0m `);
+  // Dimmed divider line + prompt on new line (Claude CLI style)
+  const cols = term.cols || 80;
+  const divider = "─".repeat(Math.min(cols, 120));
+  term.write(`\x1b[2m${divider}\x1b[0m\r\n`);
+  term.write(`\x1b[2m>\x1b[0m `);
 }
 
 function detectProvider(query: string): string {
@@ -215,10 +266,34 @@ function detectProvider(query: string): string {
   if (lower.startsWith("gemini:") || lower.startsWith("g:")) return "gemini";
   if (lower.startsWith("local:") || lower.startsWith("l:")) return "local";
 
-  const codeWords = ["implement", "build", "fix", "debug", "refactor", "deploy", "write", "create"];
-  for (const w of codeWords) { if (lower.includes(w)) return "claude"; }
-  const researchWords = ["explain", "compare", "what", "how", "analyze", "research", "find"];
-  for (const w of researchWords) { if (lower.includes(w)) return "gemini"; }
+  const words = lower.split(/\s+/).map((w) => w.replace(/[^a-z0-9]/g, ""));
+
+  // Code signals — any single match → Claude
+  const codeWords = [
+    "implement", "build", "fix", "debug", "refactor", "deploy", "publish",
+    "commit", "compile", "migration", "scaffold", "architect", "optimize",
+  ];
+  if (codeWords.some((kw) => words.includes(kw))) return "claude";
+
+  // Code context words — also route to Claude
+  const codeCtx = [
+    "bug", "error", "crash", "feature", "function", "component", "endpoint",
+    "api", "route", "schema", "test", "cargo", "npm", "git", "rust", "typescript",
+  ];
+  if (codeCtx.some((kw) => words.includes(kw))) return "claude";
+
+  // Code syntax → Claude
+  if (/```|fn |function |class |import |async |struct |pub |const /.test(lower)) return "claude";
+  if (/\.(rs|ts|tsx|js|py|toml)\b/.test(lower)) return "claude";
+
+  // Research signals → Gemini
+  const researchWords = [
+    "explain", "compare", "analyze", "research", "summarize",
+    "alternative", "competitor", "trend", "review", "difference",
+  ];
+  if (researchWords.some((kw) => words.includes(kw))) return "gemini";
+  if (/what is|how does|how to|pros and cons|difference between/.test(lower)) return "gemini";
+
   return "ollama";
 }
 

@@ -13,6 +13,7 @@ interface KeyboardCallbacks {
   addTab: () => void;
   closeTab: () => void;
   switchTabByIndex: (index: number) => void;
+  toggleSettings: () => void;
 }
 
 export function useKeyboard({
@@ -26,10 +27,17 @@ export function useKeyboard({
   addTab,
   closeTab,
   switchTabByIndex,
+  toggleSettings,
 }: KeyboardCallbacks): void {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!e.metaKey) return;
+
+      if (e.key === ",") {
+        e.preventDefault();
+        toggleSettings();
+        return;
+      }
 
       if (e.key === "k") {
         e.preventDefault();
@@ -80,5 +88,6 @@ export function useKeyboard({
     addTab,
     closeTab,
     switchTabByIndex,
+    toggleSettings,
   ]);
 }

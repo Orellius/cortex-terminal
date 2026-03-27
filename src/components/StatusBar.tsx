@@ -186,19 +186,19 @@ export function StatusBar({
             Model Routing
           </div>
           <div style={{ color: "#71717a", marginBottom: "0.5rem" }}>
-            Queries are scored 0-10 based on keywords:
+            Queries are scored 0-10 based on word signals:
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
             <div>
-              <span style={{ color: "#8b5cf6" }}>◆ Claude (7+)</span>
-              <span style={{ color: "#52525b" }}> — implement, build, fix, debug, refactor, deploy, code syntax</span>
+              <span style={{ color: "#8b5cf6" }}>◆ Claude (5+)</span>
+              <span style={{ color: "#52525b" }}> — fix, build, debug, refactor, deploy, bug, error, .rs/.ts, code syntax</span>
             </div>
             <div>
-              <span style={{ color: "#0ea5e9" }}>◈ Gemini (4-6)</span>
-              <span style={{ color: "#52525b" }}> — explain, compare, analyze, research, summarize</span>
+              <span style={{ color: "#0ea5e9" }}>◈ Gemini (3-4)</span>
+              <span style={{ color: "#52525b" }}> — explain, compare, analyze, research, summarize, "what is", "how to"</span>
             </div>
             <div>
-              <span style={{ color: "#10b981" }}>● Nemotron (0-3)</span>
+              <span style={{ color: "#10b981" }}>● Nemotron (0-2)</span>
               <span style={{ color: "#52525b" }}> — short queries, simple questions, default fallback</span>
             </div>
           </div>

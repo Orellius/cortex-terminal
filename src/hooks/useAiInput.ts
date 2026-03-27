@@ -1,7 +1,7 @@
 import { useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Terminal } from "@xterm/xterm";
-import { formatThinking } from "../ai/formatter";
+import { startThinking } from "../ai/thinking";
 
 const encoder = new TextEncoder();
 
@@ -183,9 +183,9 @@ export function useAiInput(
             // Visual newline ONLY — do NOT send to PTY (would execute as shell command)
             term.write("\r\n");
 
-            // Show thinking indicator immediately
+            // Show animated thinking indicator
             const provider = detectProvider(query);
-            term.write(formatThinking(provider));
+            startThinking(term, provider);
 
             // Send to AI
             invoke("send_ai_query", {
@@ -245,20 +245,41 @@ export function useAiInput(
   return handleData;
 }
 
-/** Detect which provider will handle this query (for thinking indicator) */
+/** Detect which provider will handle this query (for thinking indicator).
+ *  Must stay in sync with Rust router (src-tauri/src/ai/router.rs). */
 function detectProvider(query: string): string {
   const lower = query.toLowerCase();
   if (lower.startsWith("claude:") || lower.startsWith("c:")) return "claude";
   if (lower.startsWith("gemini:") || lower.startsWith("g:")) return "gemini";
   if (lower.startsWith("local:") || lower.startsWith("l:")) return "local";
 
-  const codeWords = ["implement", "build", "fix", "debug", "refactor", "deploy", "write code", "create file"];
-  for (const w of codeWords) {
-    if (lower.includes(w)) return "claude";
-  }
-  const researchWords = ["explain", "compare", "what is", "how does", "analyze", "research", "find"];
-  for (const w of researchWords) {
-    if (lower.includes(w)) return "gemini";
-  }
+  const words = lower.split(/\s+/).map((w) => w.replace(/[^a-z0-9]/g, ""));
+
+  // Code signals — any single match → Claude
+  const codeWords = [
+    "implement", "build", "fix", "debug", "refactor", "deploy", "publish",
+    "commit", "compile", "migration", "scaffold", "architect", "optimize",
+  ];
+  if (codeWords.some((kw) => words.includes(kw))) return "claude";
+
+  // Code context words — also route to Claude
+  const codeCtx = [
+    "bug", "error", "crash", "feature", "function", "component", "endpoint",
+    "api", "route", "schema", "test", "cargo", "npm", "git", "rust", "typescript",
+  ];
+  if (codeCtx.some((kw) => words.includes(kw))) return "claude";
+
+  // Code syntax → Claude
+  if (/```|fn |function |class |import |async |struct |pub |const /.test(lower)) return "claude";
+  if (/\.(rs|ts|tsx|js|py|toml)\b/.test(lower)) return "claude";
+
+  // Research signals → Gemini
+  const researchWords = [
+    "explain", "compare", "analyze", "research", "summarize",
+    "alternative", "competitor", "trend", "review", "difference",
+  ];
+  if (researchWords.some((kw) => words.includes(kw))) return "gemini";
+  if (/what is|how does|how to|pros and cons|difference between/.test(lower)) return "gemini";
+
   return "ollama";
 }
