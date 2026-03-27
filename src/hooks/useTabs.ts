@@ -6,6 +6,7 @@ interface UseTabsResult {
   activeTabId: string;
   addTab: (kind?: TabKind, cwd?: string) => void;
   closeTab: (id: string) => void;
+  reopenLastClosedTab: () => void;
   switchTab: (id: string) => void;
   updateTabTitle: (id: string, title: string) => void;
   updateTabCwd: (id: string, cwd: string) => void;
@@ -34,6 +35,7 @@ function makeTab(cwd: string, kind: TabKind = "ai"): Tab {
 export function useTabs(homeDir: string): UseTabsResult {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>("");
+  const closedTabs = useRef<Tab[]>([]);
   const initialized = useRef(false);
 
   useEffect(() => {
@@ -58,6 +60,10 @@ export function useTabs(homeDir: string): UseTabsResult {
       setTabs((prev) => {
         if (prev.length <= 1) return prev;
         const idx = prev.findIndex((t) => t.id === id);
+        const closing = prev.find((t) => t.id === id);
+        if (closing) {
+          closedTabs.current = [closing, ...closedTabs.current].slice(0, 10);
+        }
         const next = prev.filter((t) => t.id !== id);
         setActiveTabId((current) => {
           if (current !== id) return current;
@@ -69,6 +75,13 @@ export function useTabs(homeDir: string): UseTabsResult {
     },
     []
   );
+
+  const reopenLastClosedTab = useCallback(() => {
+    const last = closedTabs.current.shift();
+    if (!last) return;
+    setTabs((prev) => [...prev, last]);
+    setActiveTabId(last.id);
+  }, []);
 
   const switchTab = useCallback((id: string) => {
     setActiveTabId(id);
@@ -143,6 +156,7 @@ export function useTabs(homeDir: string): UseTabsResult {
     activeTabId,
     addTab,
     closeTab,
+    reopenLastClosedTab,
     switchTab,
     updateTabTitle,
     updateTabCwd,

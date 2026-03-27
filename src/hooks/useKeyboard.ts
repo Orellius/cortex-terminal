@@ -17,6 +17,7 @@ interface KeyboardCallbacks {
   splitVertical: () => void;
   splitHorizontal: () => void;
   togglePasteHistory: () => void;
+  reopenClosedTab: () => void;
 }
 
 export function useKeyboard({
@@ -34,6 +35,7 @@ export function useKeyboard({
   splitVertical,
   splitHorizontal,
   togglePasteHistory,
+  reopenClosedTab,
 }: KeyboardCallbacks): void {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -79,7 +81,13 @@ export function useKeyboard({
         return;
       }
 
-      if (e.key === "t") {
+      if (e.key === "t" && e.shiftKey) {
+        e.preventDefault();
+        reopenClosedTab();
+        return;
+      }
+
+      if (e.key === "t" && !e.shiftKey) {
         e.preventDefault();
         addTab();
         return;
@@ -116,5 +124,6 @@ export function useKeyboard({
     splitVertical,
     splitHorizontal,
     togglePasteHistory,
+    reopenClosedTab,
   ]);
 }

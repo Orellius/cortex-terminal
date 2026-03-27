@@ -31,6 +31,7 @@ export function App(): JSX.Element {
     splitPane,
     closePaneInTab,
     setActivePaneInTab,
+    reopenLastClosedTab,
   } = useTabs(homeDir);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
@@ -174,6 +175,7 @@ export function App(): JSX.Element {
     splitVertical: () => splitPane("vertical"),
     splitHorizontal: () => splitPane("horizontal"),
     togglePasteHistory: pasteHistory.toggleHistory,
+    reopenClosedTab: reopenLastClosedTab,
   });
 
   const { branch, usage } = useStatusPoll(activeTab?.cwd ?? "");
