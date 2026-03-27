@@ -35,6 +35,7 @@ export function AiChatView({ paneId, isActive, cwd, showSearch, onCloseSearch, o
   const [thinking, setThinking] = useState<{ provider: string; startTime: number } | null>(null);
   const [sidebarFile, setSidebarFile] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const messagesRef = useRef<ChatMessage[]>([]);
   const [sidebarContent, setSidebarContent] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const conversationId = useRef<string | null>(null);
@@ -60,6 +61,9 @@ export function AiChatView({ paneId, isActive, cwd, showSearch, onCloseSearch, o
       .then((id) => { conversationId.current = id; })
       .catch(() => {});
   }, [paneId]);
+
+  // Keep messages ref in sync
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -175,8 +179,38 @@ export function AiChatView({ paneId, isActive, cwd, showSearch, onCloseSearch, o
     return () => { unlisten?.(); };
   }, [paneId]);
 
+  const slashHandler = useCallback((cmd: string, _args: string) => {
+    const sysMsg = (content: string) => setMessages((prev) => [...prev, {
+      id: crypto.randomUUID(), role: "assistant" as const, provider: "system", model: "cortex", content, timestamp: Date.now(),
+    }]);
+    if (cmd === "/clear") { setMessages([]); }
+    else if (cmd === "/settings") { onOpenSettings?.(); }
+    else if (cmd === "/search") { onOpenSearch?.(); }
+    else if (cmd === "/palette") { onOpenPalette?.(); }
+    else if (cmd === "/help") { sysMsg("Commands: /clear /settings /search /palette /preview /help /model /budget\nPrefixes: ! shell · c: claude · s: sonnet · l: local"); }
+    else if (cmd === "/model") { sysMsg("Routing: score 5+ -> Claude, 3-4 -> Sonnet, 0-2 -> Local\nForce: c: s: l: prefixes"); }
+    else if (cmd === "/preview") {
+      const lastAssistant = [...messagesRef.current].reverse().find((m) => m.role === "assistant");
+      if (lastAssistant) { openMarkdownContent(lastAssistant.content); }
+      else { sysMsg("No response to preview"); }
+    }
+    else if (cmd === "/budget") {
+      invoke<{ spent_today: number; limit: number; is_capped: boolean }>("get_budget_status")
+        .then((b) => sysMsg(`Budget: $${b.spent_today.toFixed(4)} / $${b.limit.toFixed(2)}${b.is_capped ? " [CAPPED - local only]" : ""}`))
+        .catch(() => sysMsg("Budget: unavailable"));
+    }
+    else { sysMsg(`Unknown command: ${cmd}`); }
+  }, [onOpenSettings, onOpenSearch, onOpenPalette, openMarkdownContent]);
+
   const handleSubmit = useCallback(
     (text: string) => {
+      // Slash commands
+      if (text.startsWith("/")) {
+        const parts = text.trim().split(/\s+/);
+        slashHandler(parts[0], parts.slice(1).join(" "));
+        return;
+      }
+
       // Shell escape: ! prefix — execute command and show output inline
       if (text.startsWith("!")) {
         const cmd = text.slice(1).trim();
@@ -423,23 +457,7 @@ export function AiChatView({ paneId, isActive, cwd, showSearch, onCloseSearch, o
       <AiChatInput
         onSubmit={handleSubmit}
         disabled={thinking !== null}
-        onSlashCommand={(cmd, _args) => {
-          const sysMsg = (content: string) => setMessages((prev) => [...prev, {
-            id: crypto.randomUUID(), role: "assistant" as const, provider: "system", model: "cortex", content, timestamp: Date.now(),
-          }]);
-          if (cmd === "/clear") { setMessages([]); }
-          else if (cmd === "/settings") { onOpenSettings?.(); }
-          else if (cmd === "/search") { onOpenSearch?.(); }
-          else if (cmd === "/palette") { onOpenPalette?.(); }
-          else if (cmd === "/help") { sysMsg("Commands: /clear /settings /search /palette /help /model /budget\nPrefixes: ! shell · c: claude · s: sonnet · l: local"); }
-          else if (cmd === "/model") { sysMsg("Routing: score 5+ → Claude, 3-4 → Sonnet, 0-2 → Local\nForce: c: s: l: prefixes"); }
-          else if (cmd === "/budget") {
-            invoke<{ spent_today: number; limit: number; is_capped: boolean }>("get_budget_status")
-              .then((b) => sysMsg(`Budget: $${b.spent_today.toFixed(4)} / $${b.limit.toFixed(2)}${b.is_capped ? " [CAPPED — local only]" : ""}`))
-              .catch(() => sysMsg("Budget: unavailable"));
-          }
-          else { sysMsg(`Unknown command: ${cmd}`); }
-        }}
+        onSlashCommand={slashHandler}
       />
 
       {/* Markdown sidebar */}

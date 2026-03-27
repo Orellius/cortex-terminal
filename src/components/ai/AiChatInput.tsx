@@ -11,6 +11,7 @@ const SLASH_COMMANDS = [
   { cmd: "/settings", description: "Open settings" },
   { cmd: "/search", description: "Search in chat" },
   { cmd: "/palette", description: "Open command palette" },
+  { cmd: "/preview", description: "Preview last response as rich markdown" },
   { cmd: "/help", description: "Show available commands" },
   { cmd: "/model", description: "Show current model info" },
   { cmd: "/budget", description: "Show budget status" },

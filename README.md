@@ -207,6 +207,50 @@ For AI features (optional but recommended):
 - [Claude Code CLI](https://claude.ai/code) for Claude provider
 - [Ollama](https://ollama.ai/) for local model provider
 
+### Setting up AI providers
+
+**Claude (via CLI subscription)**
+
+```bash
+# Install Claude Code CLI
+npm install -g @anthropic-ai/claude-code
+
+# Login (opens browser for OAuth)
+claude login
+
+# Verify
+claude --version
+```
+
+Cortex detects Claude automatically. No API key needed. Uses your existing Claude Pro/Max subscription.
+
+**Ollama (local, free)**
+
+```bash
+# Install from ollama.ai or via Homebrew
+brew install ollama
+
+# Start the server
+ollama serve
+
+# Pull a model
+ollama pull qwen3:8b        # fast, good for quick queries
+ollama pull nemotron:12b     # strong reasoning
+ollama pull deepseek-r1:32b  # heavy, best quality
+```
+
+Cortex connects to `http://localhost:11434` by default. Change the endpoint in Settings > Providers.
+
+**Project directory for launcher**
+
+The project launcher (Cmd+K) scans for git repos. Set `CORTEX_PROJECTS_DIR` to your projects folder:
+
+```bash
+export CORTEX_PROJECTS_DIR=~/Projects
+```
+
+Or it auto-detects `~/Projects`, `~/Desktop/Projects`, `~/Developer`, or `~/dev`.
+
 ### Build from source
 
 ```bash

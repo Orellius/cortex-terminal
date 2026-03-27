@@ -166,7 +166,8 @@ function renderMarkdownToHtml(text: string): string {
   let codeLang = "";
   let inList = false;
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     // Code blocks
     if (line.trim().startsWith("```")) {
       if (!inCodeBlock) {
@@ -236,6 +237,36 @@ function renderMarkdownToHtml(text: string): string {
 
     if (inList) { result.push("</ul>"); inList = false; }
 
+    // Blockquote
+    if (line.startsWith("> ")) {
+      const quoteText = applyInlineFormatting(escapeHtml(line.slice(2)));
+      result.push(`<div style="border-left:3px solid #05a0ef;padding:0.375rem 0.75rem;margin:0.375rem 0;color:#a1a1aa;font-style:italic">${quoteText}</div>`);
+      continue;
+    }
+
+    // Table row detection (collect and render as HTML table)
+    if (line.includes("|") && line.trim().startsWith("|")) {
+      const cells = line.split("|").filter((c) => c.trim() !== "");
+      // Skip separator rows like |---|---|
+      if (cells.every((c) => /^[\s-:]+$/.test(c))) continue;
+      const isHeader = i > 0 && i < lines.length - 1 && lines[i + 1]?.includes("---");
+      const tag = isHeader ? "th" : "td";
+      const cellStyle = `padding:0.375rem 0.75rem;border:1px solid rgba(255,255,255,0.06);font-size:0.75rem;${isHeader ? "color:#e4e4e7;font-weight:600;background:rgba(255,255,255,0.03)" : "color:#a1a1aa"}`;
+      const row = cells.map((c) => `<${tag} style="${cellStyle}">${applyInlineFormatting(escapeHtml(c.trim()))}</${tag}>`).join("");
+      // Wrap first table row in <table>
+      const prevLine = result[result.length - 1] ?? "";
+      if (!prevLine.includes("<table")) {
+        result.push('<table style="border-collapse:collapse;margin:0.5rem 0;width:100%">');
+      }
+      result.push(`<tr>${row}</tr>`);
+      // Check if next line is not a table row, close table
+      const nextLine = lines[i + 1]?.trim() ?? "";
+      if (!nextLine.startsWith("|")) {
+        result.push("</table>");
+      }
+      continue;
+    }
+
     // Regular paragraph
     result.push(`<p style="margin:0.25rem 0">${applyInlineFormatting(processed)}</p>`);
   }
@@ -249,6 +280,8 @@ function applyInlineFormatting(text: string): string {
   let result = text.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#e4e4e7">$1</strong>');
   // *italic*
   result = result.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  // ~~strikethrough~~
+  result = result.replace(/~~(.+?)~~/g, "<s>$1</s>");
   // `inline code`
   result = result.replace(
     /`([^`]+)`/g,

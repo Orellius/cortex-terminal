@@ -277,13 +277,25 @@ pub(crate) struct ProjectEntry {
     pub path: String,
 }
 
-/// Lists all git repos under `~/Desktop/Orellius/Projects/`, scanning up to
-/// 2 levels deep (handles category folders like active/, mcp-servers/, etc.).
-/// Each entry shows `category/name` for nested repos. Sorted alphabetically.
+/// Lists all git repos under ~/Projects (or CORTEX_PROJECTS_DIR env var),
+/// scanning up to 2 levels deep. Each entry shows `category/name` for
+/// nested repos. Sorted alphabetically.
 #[tauri::command]
 pub(crate) async fn list_projects() -> Result<Vec<ProjectEntry>, String> {
     let home = std::env::var("HOME").map_err(|e| format!("HOME not set: {e}"))?;
-    let projects_dir = Path::new(&home).join("Desktop/Orellius/Projects");
+    // Check env var first, then common locations
+    let projects_dir = std::env::var("CORTEX_PROJECTS_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            let candidates = [
+                Path::new(&home).join("Projects"),
+                Path::new(&home).join("Desktop/Projects"),
+                Path::new(&home).join("Developer"),
+                Path::new(&home).join("dev"),
+            ];
+            candidates.into_iter().find(|p| p.is_dir())
+                .unwrap_or_else(|| Path::new(&home).join("Projects"))
+        });
 
     if !projects_dir.is_dir() {
         return Ok(Vec::new());
