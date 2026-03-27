@@ -59,6 +59,7 @@ pub(crate) async fn check_providers(
 pub(crate) async fn send_ai_query(
     query: String,
     pane_id: String,
+    conversation_id: Option<String>,
     app: AppHandle,
     config_state: State<'_, Arc<std::sync::Mutex<CortexConfig>>>,
     db: State<'_, Arc<Database>>,
@@ -84,11 +85,28 @@ pub(crate) async fn send_ai_query(
     let pane_owned = pane_id.clone();
     let db_arc = Arc::clone(&db);
 
+    // Load conversation history for context (last 20 messages max)
+    let history = conversation_id
+        .as_ref()
+        .and_then(|cid| db.get_messages(cid).ok())
+        .unwrap_or_default();
+
+    // Build history string for context (limit to last 20 messages to stay within token limits)
+    let history_context: Vec<(String, String)> = history
+        .iter()
+        .rev()
+        .take(20)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .map(|m| (m.role.clone(), m.content.clone()))
+        .collect();
+
     // Execute in background — never block the IPC thread
     tokio::task::spawn_blocking(move || {
         let start = std::time::Instant::now();
 
-        let result = providers::execute(&query_owned, provider, &model, &config, None);
+        let result = providers::execute(&query_owned, provider, &model, &config, None, &history_context);
         let duration_ms = start.elapsed().as_millis() as u64;
 
         let (content, cost, verified) = match result {

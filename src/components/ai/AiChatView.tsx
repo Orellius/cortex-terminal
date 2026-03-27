@@ -164,8 +164,12 @@ export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
       const provider = detectProvider(text);
       setThinking({ provider, startTime: Date.now() });
 
-      // Send to AI backend
-      invoke("send_ai_query", { query: text, paneId }).catch((err: unknown) => {
+      // Send to AI backend with conversation history
+      invoke("send_ai_query", {
+        query: text,
+        paneId,
+        conversationId: conversationId.current,
+      }).catch((err: unknown) => {
         setThinking(null);
         const errMsg = err instanceof Error ? err.message : String(err);
         setMessages((prev) => [
