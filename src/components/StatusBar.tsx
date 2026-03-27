@@ -20,6 +20,7 @@ interface StatusBarProps {
   branch: string;
   usage: ClaudeUsage;
   onOpenLauncher: () => void;
+  onOpenSettings: () => void;
 }
 
 function usageColor(pct: number): string {
@@ -44,6 +45,7 @@ export function StatusBar({
   branch,
   usage,
   onOpenLauncher,
+  onOpenSettings,
 }: StatusBarProps): JSX.Element {
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [budget, setBudget] = useState<BudgetStatus>({ spent_today: 0, limit: 5, is_capped: false });
@@ -149,6 +151,27 @@ export function StatusBar({
           {Math.round(usage.weekly_pct)}%
         </span>
       </span>
+      {/* Settings button with Cmd+, hint */}
+      <span
+        onClick={onOpenSettings}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.25rem",
+          padding: "0.125rem 0.375rem",
+          borderRadius: "0.25rem",
+          border: "1px solid rgba(255, 255, 255, 0.06)",
+          color: "#52525b",
+          fontSize: "0.6875rem",
+          cursor: "pointer",
+          lineHeight: 1,
+          transition: "color 100ms, border-color 100ms",
+        }}
+        title="Settings (Cmd+,)"
+      >
+        <span style={{ fontSize: "0.625rem" }}>&#8984;</span>,
+      </span>
+
       {/* Routing info button */}
       <span
         onClick={() => setShowInfo(!showInfo)}

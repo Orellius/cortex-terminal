@@ -218,6 +218,7 @@ export function App(): JSX.Element {
         branch={branch}
         usage={usage}
         onOpenLauncher={openLauncher}
+        onOpenSettings={() => setShowSettings(true)}
       />
       {showLauncher && (
         <ProjectLauncher
