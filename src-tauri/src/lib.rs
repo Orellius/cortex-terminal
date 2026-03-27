@@ -1,5 +1,6 @@
 mod ai;
 mod commands;
+mod ipc_server;
 mod pty;
 mod types;
 
@@ -75,7 +76,11 @@ pub fn run() {
             let db = Database::init(&data_dir)
                 .map_err(|e| anyhow::anyhow!("database init failed: {e}"))?;
 
-            app.manage(Arc::new(db));
+            let db = Arc::new(db);
+            app.manage(db.clone());
+
+            // Start IPC server for CLI bridge
+            ipc_server::start_ipc_server(app.handle().clone(), db);
 
             log::info!("Cortex v2 started — AI providers ready");
             Ok(())
