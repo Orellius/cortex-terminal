@@ -11,7 +11,8 @@ use ai::config;
 use ai::database::Database;
 use ai::types::CortexConfig;
 use commands::ai_commands::{
-    check_providers, get_ai_config, get_budget_status, send_ai_query, update_ai_config,
+    check_providers, get_ai_config, get_budget_status, list_ollama_models, scan_ai_clis,
+    send_ai_query, update_ai_config,
 };
 use commands::chat_commands::{add_message, create_conversation, get_messages, list_conversations};
 use commands::pty_commands::{kill_pty, resize_pty, spawn_pty, write_pty, PtyState};
@@ -62,6 +63,7 @@ pub fn run() {
             get_git_branch, get_claude_usage, get_home_dir, list_projects,
             // AI
             check_providers, send_ai_query, get_ai_config, update_ai_config, get_budget_status,
+            scan_ai_clis, list_ollama_models,
             // Chat persistence
             create_conversation, add_message, get_messages, list_conversations,
         ])

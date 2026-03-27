@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { TERMINAL_THEME } from "../constants";
 import { formatAiResponse } from "../ai/formatter";
-import { startThinking } from "../ai/thinking";
+import { startThinking, type ThinkingAnimation } from "../ai/thinking";
 import { RESET, BOLD, DIM } from "../ai/constants";
 
 interface AiStreamEvent {
@@ -39,7 +39,7 @@ export function useAiTerminal(
   const fitRef = useRef<FitAddon | null>(null);
   const lineBuffer = useRef("");
   const conversationId = useRef<string | null>(null);
-  const thinkingAnim = useRef<{ stop: () => void } | null>(null);
+  const thinkingAnim = useRef<ThinkingAnimation | null>(null);
 
   useEffect(() => {
     if (!isActive) {

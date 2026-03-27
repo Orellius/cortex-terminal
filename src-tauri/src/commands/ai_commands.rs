@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
 use crate::ai::config;
@@ -171,4 +172,119 @@ fn estimate_cost(provider: ProviderKind, output: &str) -> f64 {
 
 fn truncate(s: &str, max: usize) -> String {
     if s.len() <= max { s.to_string() } else { format!("{}...", &s[..max]) }
+}
+
+// ─── Auto-detection commands ────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct DetectedCli {
+    pub name: String,
+    pub path: String,
+    pub version: String,
+    pub available: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct OllamaModel {
+    pub name: String,
+    pub size: String,
+    pub modified_at: String,
+}
+
+/// Scan for available AI CLIs on the system.
+#[tauri::command]
+pub(crate) async fn scan_ai_clis() -> Result<Vec<DetectedCli>, String> {
+    tokio::task::spawn_blocking(|| {
+        let mut clis = Vec::new();
+
+        // Claude CLI
+        clis.push(detect_cli("claude", &["/opt/homebrew/bin/claude", "/usr/local/bin/claude"]));
+        // Ollama
+        clis.push(detect_cli("ollama", &["/opt/homebrew/bin/ollama", "/usr/local/bin/ollama"]));
+        // Aider
+        clis.push(detect_cli("aider", &["/opt/homebrew/bin/aider", "/usr/local/bin/aider"]));
+
+        clis
+    })
+    .await
+    .map_err(|e| format!("scan failed: {e}"))
+}
+
+/// List locally available Ollama models.
+#[tauri::command]
+pub(crate) async fn list_ollama_models(
+    config_state: State<'_, Arc<std::sync::Mutex<CortexConfig>>>,
+) -> Result<Vec<OllamaModel>, String> {
+    let endpoint = {
+        let config = config_state.lock().map_err(|_| "config mutex poisoned")?;
+        config.ollama_endpoint.clone()
+    };
+
+    tokio::task::spawn_blocking(move || {
+        let resp = reqwest::blocking::get(format!("{endpoint}/api/tags"))
+            .map_err(|e| format!("ollama unreachable: {e}"))?;
+        let parsed: serde_json::Value = resp.json().map_err(|e| format!("parse error: {e}"))?;
+
+        let models = parsed["models"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .map(|m| OllamaModel {
+                        name: m["name"].as_str().unwrap_or("").to_string(),
+                        size: format_bytes(m["size"].as_u64().unwrap_or(0)),
+                        modified_at: m["modified_at"].as_str().unwrap_or("").to_string(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        Ok(models)
+    })
+    .await
+    .map_err(|e| format!("task failed: {e}"))?
+}
+
+fn detect_cli(name: &str, paths: &[&str]) -> DetectedCli {
+    use std::process::{Command, Stdio};
+
+    for path in paths {
+        if let Ok(output) = Command::new(path)
+            .arg("--version")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+        {
+            if output.status.success() {
+                let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                let version = if version.is_empty() {
+                    String::from_utf8_lossy(&output.stderr).trim().to_string()
+                } else {
+                    version
+                };
+                return DetectedCli {
+                    name: name.to_string(),
+                    path: path.to_string(),
+                    version: version.lines().next().unwrap_or("unknown").to_string(),
+                    available: true,
+                };
+            }
+        }
+    }
+
+    DetectedCli {
+        name: name.to_string(),
+        path: String::new(),
+        version: String::new(),
+        available: false,
+    }
+}
+
+fn format_bytes(bytes: u64) -> String {
+    if bytes >= 1_073_741_824 {
+        format!("{:.1} GB", bytes as f64 / 1_073_741_824.0)
+    } else if bytes >= 1_048_576 {
+        format!("{:.1} MB", bytes as f64 / 1_048_576.0)
+    } else {
+        format!("{} B", bytes)
+    }
 }

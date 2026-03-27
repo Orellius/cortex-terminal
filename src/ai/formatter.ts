@@ -1,6 +1,6 @@
 import { PROVIDER_COLORS, RESET, BOLD, DIM } from "./constants";
 
-interface FormatOptions {
+export interface FormatOptions {
   readonly provider: string;
   readonly model: string;
   readonly content: string;
@@ -9,9 +9,11 @@ interface FormatOptions {
   readonly verified: boolean;
 }
 
-/** Model display names with provider context */
+/** Model display names */
 const MODEL_DISPLAY: Record<string, string> = {
   "nemotron-cascade-2": "Nemotron Cascade 2",
+  "nemotron-3-nano:4b": "Nemotron 3 Nano 4B",
+  "nemotron-3-nano:30b": "Nemotron 3 Nano 30B",
   "qwen2.5-coder:32b": "Qwen 2.5 Coder 32B",
   "dolphin-llama3:8b": "Dolphin Llama3 8B",
   "gemini-2.0-flash": "Gemini 2.0 Flash",
@@ -20,34 +22,97 @@ const MODEL_DISPLAY: Record<string, string> = {
   "opus": "Claude Opus",
 };
 
-/** Provider icons (unicode) */
+/** Provider icons */
 const PROVIDER_ICON: Record<string, string> = {
   claude: "◆",
   gemini: "◈",
   ollama: "●",
 };
 
-/** Format an AI response for inline terminal display */
+/**
+ * Format an AI response for terminal display (Claude CLI style).
+ * Multi-line with basic ANSI markdown rendering + stats footer.
+ */
 export function formatAiResponse(opts: FormatOptions): string {
   const color = PROVIDER_COLORS[opts.provider] ?? "\x1b[37m";
   const icon = PROVIDER_ICON[opts.provider] ?? "○";
   const displayName = MODEL_DISPLAY[opts.model] ?? opts.model;
   const costStr = opts.cost > 0 ? `$${opts.cost.toFixed(4)}` : "$0";
   const duration = (opts.durationMs / 1000).toFixed(1);
+  const tokenEst = Math.round(opts.content.length / 4);
 
   const cleaned = stripThinkTags(opts.content);
+  const rendered = renderAnsiMarkdown(cleaned);
 
-  // Compact format: model name > response (cost · time)
-  const response = cleaned.replace(/\n/g, " ").trim();
-  const meta = `${DIM}${costStr} · ${duration}s${RESET}`;
+  // Provider badge
+  const badge = `${color}${icon} ${displayName}${RESET}`;
 
-  return `${color}${icon} ${displayName}${RESET} ${DIM}>${RESET} ${response} ${meta}\r\n`;
+  // Response body — preserve line breaks
+  const body = rendered
+    .split("\n")
+    .map((line) => `  ${line}`)
+    .join("\r\n");
+
+  // Stats footer
+  const stats = `${DIM}${costStr} · ~${tokenEst} tokens · ${duration}s${RESET}`;
+  const verification = opts.verified ? "" : ` ${DIM}\x1b[33m[unverified]${RESET}`;
+
+  return `${badge}${verification}\r\n${body}\r\n\r\n${stats}\r\n`;
 }
 
-/** Strip ALL thinking/reasoning blocks from model output.
- *  Handles: <think>...</think>, unclosed <think>, </think> without opener,
- *  and any other XML-like reasoning tags models might emit. */
-function stripThinkTags(content: string): string {
+/**
+ * Basic ANSI markdown rendering for terminal.
+ * Handles: **bold**, `inline code`, ```code blocks```, headers.
+ */
+function renderAnsiMarkdown(text: string): string {
+  const lines = text.split("\n");
+  const result: string[] = [];
+  let inCodeBlock = false;
+
+  for (const line of lines) {
+    // Code block toggle
+    if (line.trim().startsWith("```")) {
+      inCodeBlock = !inCodeBlock;
+      if (inCodeBlock) {
+        const lang = line.trim().slice(3).trim();
+        result.push(lang ? `${DIM}  ${lang}${RESET}` : "");
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      // Code block content — dim + monospace look
+      result.push(`${DIM}  ${line}${RESET}`);
+      continue;
+    }
+
+    let processed = line;
+
+    // Headers: # → bold
+    if (/^#{1,3}\s/.test(processed)) {
+      processed = processed.replace(/^#{1,3}\s+/, "");
+      processed = `${BOLD}${processed}${RESET}`;
+    }
+
+    // **bold** → ANSI bold
+    processed = processed.replace(/\*\*(.+?)\*\*/g, `${BOLD}$1${RESET}`);
+
+    // `inline code` → dim
+    processed = processed.replace(/`([^`]+)`/g, `${DIM}$1${RESET}`);
+
+    // - bullet points → keep with bullet
+    if (/^\s*[-*]\s/.test(processed)) {
+      processed = processed.replace(/^(\s*)[-*]\s/, "$1- ");
+    }
+
+    result.push(processed);
+  }
+
+  return result.join("\n");
+}
+
+/** Strip ALL thinking/reasoning blocks from model output */
+export function stripThinkTags(content: string): string {
   let result = content;
 
   // Strip <think>...</think> (with content)
@@ -73,7 +138,7 @@ function stripThinkTags(content: string): string {
   return result.trim();
 }
 
-/** Format a "thinking" indicator with model name */
+/** Format a "thinking" indicator with model name (static version for non-animated contexts) */
 export function formatThinking(provider: string): string {
   const color = PROVIDER_COLORS[provider] ?? "\x1b[37m";
   const icon = PROVIDER_ICON[provider] ?? "○";

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, type JSX } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ProvidersTab } from "./ProvidersTab";
+import { ModelsTab } from "./ModelsTab";
 import { BudgetTab } from "./BudgetTab";
 
 interface CortexConfig {
@@ -12,9 +13,10 @@ interface CortexConfig {
   daily_budget_usd: number;
 }
 
-type SettingsTab = "providers" | "routing" | "budget";
+type SettingsTab = "models" | "providers" | "routing" | "budget";
 
 const TABS: { id: SettingsTab; label: string }[] = [
+  { id: "models", label: "Models" },
   { id: "providers", label: "Providers" },
   { id: "routing", label: "Routing" },
   { id: "budget", label: "Budget" },
@@ -25,7 +27,7 @@ interface SettingsOverlayProps {
 }
 
 export function SettingsOverlay({ onClose }: SettingsOverlayProps): JSX.Element {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("providers");
+  const [activeTab, setActiveTab] = useState<SettingsTab>("models");
   const [config, setConfig] = useState<CortexConfig | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
@@ -185,6 +187,8 @@ export function SettingsOverlay({ onClose }: SettingsOverlayProps): JSX.Element 
         >
           {config === null ? (
             <div style={{ color: "#52525b", fontSize: "0.75rem" }}>Loading...</div>
+          ) : activeTab === "models" ? (
+            <ModelsTab config={config} onSave={handleSave} saving={saving} />
           ) : activeTab === "providers" ? (
             <ProvidersTab config={config} onSave={handleSave} saving={saving} />
           ) : activeTab === "routing" ? (

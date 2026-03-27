@@ -1,6 +1,9 @@
 import type { Terminal } from "@xterm/xterm";
 import { PROVIDER_COLORS, RESET, DIM } from "./constants";
 
+/** Braille spinner frames (Claude CLI style) */
+const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
 /** Random thinking status messages — rotated during AI processing */
 const THINKING_LINES: Record<string, string[]> = {
   claude: [
@@ -14,6 +17,8 @@ const THINKING_LINES: Record<string, string[]> = {
     "mapping function signatures",
     "checking constraint satisfaction",
     "synthesizing solution",
+    "scanning for patterns",
+    "validating approach",
   ],
   gemini: [
     "searching knowledge base",
@@ -26,6 +31,8 @@ const THINKING_LINES: Record<string, string[]> = {
     "processing query semantics",
     "building response framework",
     "correlating findings",
+    "scanning references",
+    "verifying facts",
   ],
   ollama: [
     "processing locally",
@@ -33,11 +40,13 @@ const THINKING_LINES: Record<string, string[]> = {
     "generating tokens",
     "computing attention",
     "decoding response",
-    "evaluating token probabilities",
-    "traversing context window",
+    "evaluating probabilities",
+    "traversing context",
     "applying reasoning chain",
-    "optimizing output quality",
+    "optimizing output",
     "finalizing response",
+    "activating experts",
+    "routing through MoE",
   ],
 };
 
@@ -47,18 +56,14 @@ const PROVIDER_ICON: Record<string, string> = {
   ollama: "●",
 };
 
-interface ThinkingAnimation {
-  stop: () => void;
+export interface ThinkingAnimation {
+  stop: () => { elapsedMs: number };
 }
 
 /**
  * Start an animated thinking indicator on the current terminal line.
- * Returns a handle to stop the animation when the response arrives.
- *
- * The animation cycle:
- * - Provider icon + rotating status text
- * - Elapsed timer (0.0s, 0.1s, ...)
- * - Updates every 800ms with a new random line
+ * Braille spinner + rotating status text + elapsed timer.
+ * Returns a handle to stop the animation.
  */
 export function startThinking(
   term: Terminal,
@@ -69,39 +74,50 @@ export function startThinking(
   const lines = THINKING_LINES[provider] ?? THINKING_LINES.ollama;
   const startTime = Date.now();
 
+  let frame = 0;
   let lineIndex = 0;
   let stopped = false;
 
-  // Shuffle the lines for variety
+  // Shuffle lines for variety
   const shuffled = [...lines].sort(() => Math.random() - 0.5);
+
+  // Change status text every ~3 spinner frames (slower rotation than spinner)
+  const TEXT_CHANGE_INTERVAL = 3;
 
   const render = (): void => {
     if (stopped) return;
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    const spinner = SPINNER[frame % SPINNER.length];
     const statusText = shuffled[lineIndex % shuffled.length];
 
-    // Erase current line, write new status
     term.write(
-      `\x1b[2K\r${color}${icon}${RESET} ${DIM}${statusText}${RESET}` +
+      `\x1b[2K\r${color}${spinner}${RESET} ` +
+      `${color}${icon}${RESET} ` +
+      `${DIM}${statusText}${RESET}` +
       `  ${DIM}${elapsed}s${RESET}`
     );
 
-    lineIndex++;
+    frame++;
+    if (frame % TEXT_CHANGE_INTERVAL === 0) {
+      lineIndex++;
+    }
   };
 
   // Initial render
   render();
 
-  // Rotate every 800ms
-  const interval = setInterval(render, 800);
+  // Spinner ticks every 100ms (fast spin), text changes every ~300ms
+  const interval = setInterval(render, 100);
 
   return {
-    stop(): void {
+    stop(): { elapsedMs: number } {
       stopped = true;
       clearInterval(interval);
-      // Clear the thinking line — caller writes the response
+      const elapsedMs = Date.now() - startTime;
+      // Clear the thinking line
       term.write("\x1b[2K\r");
+      return { elapsedMs };
     },
   };
 }
