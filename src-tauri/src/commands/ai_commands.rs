@@ -68,17 +68,18 @@ pub(crate) async fn send_ai_query(
     // Check budget
     let budget = db.get_budget_status(config.daily_budget_usd).map_err(to_err)?;
 
-    // Strip # prefix and provider overrides
-    let clean_query = query.strip_prefix('#').unwrap_or(&query).trim();
-    let clean_query = router::strip_prefix(clean_query);
+    // Strip # prefix only (keep provider prefix for routing)
+    let without_hash = query.strip_prefix('#').unwrap_or(&query).trim();
 
-    // Route to provider (force local if budget capped)
+    // Route FIRST (needs to see c:/g:/l: prefix), THEN strip for the actual prompt
     let (provider, model) = if budget.is_capped {
         (ProviderKind::Ollama, config.ollama_model.clone())
     } else {
-        router::route_query(clean_query, &config)
+        router::route_query(without_hash, &config)
     };
 
+    // Now strip the provider prefix for the actual query sent to the model
+    let clean_query = router::strip_prefix(without_hash);
     let query_owned = clean_query.to_string();
     let pane_owned = pane_id.clone();
     let db_arc = Arc::clone(&db);
