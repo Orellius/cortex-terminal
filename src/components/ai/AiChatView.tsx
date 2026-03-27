@@ -72,8 +72,8 @@ export function AiChatView({ paneId, isActive, cwd, showSearch, onCloseSearch, o
   // Focus management
   useEffect(() => {
     if (!isActive) return;
-    // Re-focus input when tab becomes active
   }, [isActive]);
+
 
   // Listen for AI stream responses (supports incremental streaming)
   useEffect(() => {
@@ -280,6 +280,16 @@ export function AiChatView({ paneId, isActive, cwd, showSearch, onCloseSearch, o
     },
     [paneId]
   );
+
+  // Listen for CLI bridge queries (cortex cli ask "...")
+  useEffect(() => {
+    if (!isActive) return;
+    let unlisten: (() => void) | undefined;
+    listen<{ query: string }>("cortex:cli:ask", (event) => {
+      handleSubmit(event.payload.query);
+    }).then((fn) => { unlisten = fn; });
+    return () => { unlisten?.(); };
+  }, [isActive, handleSubmit]);
 
   return (
     <div

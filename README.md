@@ -11,17 +11,44 @@
  ╚═════╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
 ```
 
-> Built by [Orel](https://github.com/Orellius) — [orellius.ai](https://orellius.ai)
+> AI first terminal intertwined with shell second by [Orellius.ai](https://orellius.ai)
+> Built by [Orel](https://github.com/Orellius)
 
 ---
 
-![screenshot placeholder](docs/screenshot.png)
+### Welcome
+
+![Welcome screen](docs/screenshots/01-welcome.png)
+
+### Context-aware AI
+
+Ask about your project. Cortex reads your cwd, git status, CLAUDE.md, and file tree automatically.
+
+![Context-aware response](docs/screenshots/02-context-aware.png)
+
+### Nemotron local model response
+
+Local models are context-aware too. Nemotron reads your CLAUDE.md, detects the stack, and lists active projects.
+
+![Nemotron response](docs/screenshots/04-nemotron-response.png)
+
+### Shell + AI in one flow
+
+Run shell commands inline with `!` prefix. AI responses and shell output live in the same terminal stream.
+
+![Shell execution](docs/screenshots/03-shell-exec.png)
+
+### Slash commands + rich markdown
+
+`/help` shows available commands. AI responses render markdown tables, bold text, code blocks, and LaTeX equations.
+
+![Rich markdown](docs/screenshots/05-rich-markdown.png)
 
 ---
 
 ## What it is
 
-Cortex is a native desktop terminal that puts Claude, Gemini, and local Ollama models alongside a real shell in one window. You type in a single input. The router decides which model to call based on what you wrote. Responses stream token-by-token. All models share the same MCP tool bridge, so every model can read your filesystem, run shell commands, or call any tool you configure.
+Cortex is a native desktop terminal that puts Claude and local Ollama models alongside a real shell in one window. You type in a single input. The router decides which model to call based on what you wrote. Responses stream token-by-token. All models share the same MCP tool bridge.
 
 There is no chat bubble UI, no sidebar with a robot avatar. Just a terminal.
 
@@ -31,35 +58,36 @@ There is no chat bubble UI, no sidebar with a robot avatar. Just a terminal.
 
 ### Multi-model AI
 
-Three providers run simultaneously. The router picks the right one automatically.
+Three tiers run simultaneously. The router picks the right one automatically.
 
 | Provider | Models | When used |
 |---|---|---|
-| Claude | claude-sonnet (default), claude-opus | Code, debugging, implementation |
-| Gemini | gemini-2.0-flash | Research, explanation, comparison |
-| Ollama | nemotron-cascade-2 (default), any local model | Simple queries, local-only, budget cap fallback |
+| Claude (CLI) | sonnet (default), opus, haiku | Code, debugging, implementation |
+| Claude Sonnet | sonnet | Research, explanation, comparison |
+| Ollama | any local model (qwen, nemotron, deepseek, llama) | Simple queries, local-only, budget cap fallback |
 
-Force a provider by prefixing your query:
+Force a provider with a prefix:
 
 ```
-# c: implement a binary search in Rust
-# l: what does grep do
-# s: explain the difference between Arc and Rc
+c: implement a binary search in Rust
+s: explain the difference between Arc and Rc
+l: what does grep do
 ```
 
-Automatic routing uses deterministic complexity scoring — no ML. Keywords like `implement`, `fix`, `refactor` score high and route to Claude. Questions like `what is` or `explain` route to Gemini. Short lookups route to Ollama.
+Automatic routing uses deterministic complexity scoring (no ML). Keywords like `implement`, `fix`, `refactor` score high and route to Claude. Questions like `what is` or `explain` route to Sonnet. Short lookups route to local.
 
 ### Streaming
 
-Responses stream token-by-token from both cloud providers and Ollama. The stream event fires on every chunk via Tauri's `cortex:ai:stream` IPC event. There is no wait for a complete response before rendering.
+Responses stream token-by-token from both Claude CLI and Ollama. Claude streams via stdout pipe reading, Ollama via NDJSON SSE. No waiting for a complete response before rendering.
 
 ### Context awareness
 
 Before every AI query, Cortex reads:
 
-- Current working directory
-- Git branch and status
-- Relevant project files
+- Current working directory (where you launched Cortex from)
+- Git branch and `git status --short`
+- Top-level project files
+- Stack detection (Rust, TypeScript, Python, Tauri)
 - `CLAUDE.md` if present in the project root
 
 This context is injected automatically. You do not need to paste file contents into prompts.
@@ -70,85 +98,90 @@ The last 20 messages per session are persisted to SQLite and included as history
 
 ### Shell execution
 
-Prefix any message with `!` to run it as a shell command directly inside the AI chat panel:
+Prefix any message with `!` to run it as a shell command inside the AI chat:
 
 ```
-! ls -la
-! git status
-! cargo check
+!ls -la
+!git status
+!cargo check
 ```
 
-Output appears inline in the AI chat, not in a separate terminal pane.
+Output appears inline, not in a separate terminal pane.
 
 ### Slash commands
 
 | Command | Action |
 |---|---|
-| `/clear` | Clear current AI conversation |
+| `/clear` | Clear current conversation |
 | `/help` | Show available commands |
-| `/model` | Switch active model mid-session |
+| `/model` | Show routing info |
 | `/settings` | Open settings overlay |
-| `/search` | Activate search in current pane |
+| `/search` | Activate search |
 | `/palette` | Open command palette |
 | `/budget` | Show today's spend and daily cap |
 
+### LaTeX math rendering
+
+Model responses containing LaTeX notation (`\[...\]`, `\(...\)`, `$$...$$`) render as formatted equations via KaTeX.
+
 ### Verification gate
 
-Local model (Ollama) outputs pass through a verification layer before display. If the output fails consistency checks, a `[verification failed: ...]` prefix is prepended. Cloud model outputs are marked as verified unconditionally.
+Local model outputs pass through a verification layer. If the output fails consistency checks (garbage, hallucination signals, AI-speak), a warning is prepended. The gate is smart enough to allow short answers when you ask short questions.
 
 ### Budget metering
 
-All Claude API calls are cost-estimated and logged to SQLite. When the daily budget cap is reached, the router automatically falls back to Ollama for all queries. The `/budget` command shows current spend vs. the configured limit. Default daily cap: $5.00.
+Claude CLI calls are cost-estimated and logged to SQLite. When the daily budget cap is reached, the router falls back to Ollama for all queries. Default daily cap: $5.00. Local models and CLI subscriptions are free.
 
-### MCP Bridge
+### MCP Bridge (Phase 6)
 
-Cortex runs a Model Context Protocol bridge that starts configured MCP servers on launch. All models share the same tool registry — any tool available to Claude is available to Ollama. MCP servers are configured in `~/.cortex/mcp.toml` and can be imported directly from your Claude Code config.
+Cortex runs a Model Context Protocol bridge that starts configured MCP servers on launch via JSON-RPC over stdio. All models share the same tool registry. MCP servers are configured in `~/.cortex/mcp.toml` and can be imported from your Claude Code `settings.json`.
 
 ### Terminal
 
-- Full PTY via `portable-pty` — real shell, not a subprocess wrapper
+- Full PTY via `portable-pty` (real shell, not a subprocess wrapper)
 - xterm.js v6 with DOM renderer
 - Split panes: `Cmd+D` (vertical), `Cmd+Shift+D` (horizontal)
 - Each pane gets its own PTY process
-- Shell: inherits `$SHELL` from environment (zsh by default)
 
 ### Tab management
 
-- Multiple independent sessions per window
-- Tabs labeled `1#`, `2#`, `3#` by session number
-- Double-click a tab title to rename it
+- Session numbering: `1# AI`, `2# Shell`, `3# AI`
+- Double-click tab to rename
+- Drag to reorder
+- `Cmd+Shift+T` to reopen closed tabs (10-tab recovery stack)
 - Session state persists across quit and relaunch
 
 ### Search
 
-`Cmd+F` activates incremental search in both AI chat and shell output. Powered by xterm's `@xterm/addon-search`.
+`Cmd+F` activates search in both AI chat (text filter with opacity dimming) and shell (xterm addon-search with match highlighting).
 
 ### Command palette
 
-`Cmd+Shift+P` opens a fuzzy command palette with all available actions.
+`Cmd+Shift+P` opens a fuzzy command palette listing all available actions with keyboard navigation.
 
 ### Global hotkey
 
-`Ctrl+`` ` toggles the window visibility from anywhere on the system (quake-style). Configured via `tauri-plugin-global-shortcut`.
+`Ctrl+`` ` toggles the window from anywhere on the system (quake-style drop-down).
 
-### Settings
+### Settings (9 pages)
 
-Settings overlay opened with `Cmd+,` or `/settings`. Organized into tabs:
+Sidebar layout with lucide-react icons. Opened with `Cmd+,` or `/settings`.
 
 | Tab | Contents |
 |---|---|
-| Models | Active model per provider, model picker |
-| Providers | API keys, Ollama endpoint, auto-detected CLIs |
-| Routing | Complexity thresholds, provider override defaults |
-| Budget | Daily cap in USD, spend history |
+| Models | Per-role model assignment, auto-optimize, CLI detection |
+| Providers | API keys, Ollama endpoint, connection testing |
+| Routing | Complexity scoring thresholds, override rules |
+| Budget | Daily cap, spend history, cost breakdown |
 | Permissions | Safe / Ask / Auto / Bypass modes |
-| MCP Servers | Import from Claude Code, add/remove servers |
+| MCP Servers | Add/remove/toggle, import from Claude Code |
+| Appearance | Font size, font family, cursor style, accent color, opacity |
 | Shortcuts | Keyboard shortcut reference |
-| About | Version, build info, links |
+| About | Version, stack, config paths, links |
 
-### ASCII welcome screen
+### Toast notifications
 
-On first launch, a welcome screen renders in the terminal with session info, detected providers, and available commands.
+Update notifications with action buttons (Update / Skip). Used for model updates, MCP server changes, and system alerts.
 
 ---
 
@@ -156,19 +189,20 @@ On first launch, a welcome screen renders in the terminal with session info, det
 
 | Shortcut | Action |
 |---|---|
-| `Cmd+T` | New tab |
+| `Cmd+T` | New AI tab |
 | `Cmd+W` | Close tab |
-| `Cmd+1` – `Cmd+9` | Switch to tab N |
+| `Cmd+1` to `Cmd+9` | Switch to tab N |
 | `Cmd+D` | Split pane vertically |
 | `Cmd+Shift+D` | Split pane horizontally |
 | `Cmd+F` | Search in current pane |
 | `Cmd+Shift+P` | Command palette |
 | `Cmd+,` | Open settings |
+| `Cmd+K` | Project launcher |
+| `Cmd+Shift+H` | Paste history |
+| `Cmd+Shift+T` | Reopen closed tab |
 | `Ctrl+`` ` | Toggle window (global) |
-| `Enter` | Submit AI query |
-| `Shift+Enter` | Insert newline in AI input |
-| `Up` / `Down` | Navigate input history |
-| `Escape` | Dismiss overlay / cancel |
+| `Enter` | Submit query |
+| `Shift+Enter` | New line in input |
 
 ---
 
@@ -182,17 +216,16 @@ On first launch, a welcome screen renders in the terminal with session info, det
 - [pnpm](https://pnpm.io/) 10+
 - [Tauri CLI](https://tauri.app/v2/guides/getting-started/prerequisites/) v2
 
-Optional (for AI features):
+For AI features (optional but recommended):
 
-- [Claude CLI](https://claude.ai/code) — for Claude provider
-- [Ollama](https://ollama.ai/) — for local model provider
+- [Claude Code CLI](https://claude.ai/code) for Claude provider
+- [Ollama](https://ollama.ai/) for local model provider
 
 ### Build from source
 
 ```bash
 git clone https://github.com/Orellius/cortex
 cd cortex
-
 pnpm install
 cargo tauri dev
 ```
@@ -214,19 +247,10 @@ All config lives in `~/.cortex/`. Created automatically on first launch.
 ### `~/.cortex/config.toml`
 
 ```toml
-# Model selection
 claude_model = "sonnet"
-gemini_model = "gemini-2.0-flash"
 ollama_model = "nemotron-cascade-2"
-
-# Provider config
 ollama_endpoint = "http://localhost:11434"
-gemini_api_key = ""          # optional, leave empty to disable Gemini
-
-# Budget
 daily_budget_usd = 5.0
-
-# Permissions: safe | ask | auto | bypass
 permission_mode = "ask"
 ```
 
@@ -236,20 +260,13 @@ permission_mode = "ask"
 [[servers]]
 name = "filesystem"
 command = "npx"
-args = ["-y", "@modelcontextprotocol/server-filesystem", "/Users/you/projects"]
-
-[[servers]]
-name = "github"
-command = "npx"
-args = ["-y", "@modelcontextprotocol/server-github"]
-env = { GITHUB_TOKEN = "ghp_..." }
+args = ["-y", "@modelcontextprotocol/server-filesystem", "~/"]
+enabled = true
 ```
-
-Import your existing Claude Code MCP config from Settings > MCP Servers > Import from Claude Code. This reads `~/.claude/mcp.json` and copies the server entries to `~/.cortex/mcp.toml`.
 
 ### `~/.cortex/identity.md`
 
-Optional. Write anything here — your name, role, preferred coding style, project context. This file is prepended to every AI query as a system-level identity injection.
+Optional. Write your name, role, preferred coding style, or project context. This is prepended to every AI query as identity injection. All models read this file and respond as "Cortex".
 
 ---
 
@@ -257,66 +274,65 @@ Optional. Write anything here — your name, role, preferred coding style, proje
 
 ```
 cortex/
-├── src/                        # React 19 frontend (presentational only)
+├── src/                        # React 19 frontend
 │   ├── components/
-│   │   ├── ai/                 # AiChatView, AiMessage, AiChatInput, streaming UI
-│   │   ├── settings/           # Settings overlay tabs
-│   │   ├── TabBar.tsx          # Tab management
-│   │   ├── TerminalPane.tsx    # xterm.js wrapper
-│   │   ├── StatusBar.tsx       # Provider status, git branch, budget
-│   │   └── CommandPalette.tsx
-│   ├── hooks/                  # useTerminal, useTabs, useAiStream, useKeyboard
-│   ├── types.ts                # Shared TypeScript types
-│   └── constants.ts            # Terminal theme, layout constants
+│   │   ├── ai/                 # AiChatView, AiMessage, AiChatInput
+│   │   ├── settings/           # 9-page settings (sidebar layout)
+│   │   ├── TabBar.tsx          # Tab management, drag reorder, rename
+│   │   ├── StatusBar.tsx       # Git branch, cost, Claude usage
+│   │   ├── CommandPalette.tsx  # Fuzzy action search
+│   │   └── Toast.tsx           # Notification system
+│   ├── hooks/                  # useTerminal, useTabs, useKeyboard
+│   └── types.ts
 │
 └── src-tauri/                  # Rust backend
     └── src/
         ├── ai/
         │   ├── router.rs       # Complexity-scored query routing
-        │   ├── providers.rs    # Claude CLI, Gemini API, Ollama HTTP
+        │   ├── providers.rs    # Claude CLI + Ollama streaming
         │   ├── brain.rs        # Context injection (cwd, git, CLAUDE.md)
-        │   ├── mcp.rs          # MCP bridge (stdio server management)
+        │   ├── mcp.rs          # MCP bridge (JSON-RPC stdio)
         │   ├── verification.rs # Output verification gate
-        │   ├── database.rs     # SQLite: conversations, cost log
-        │   ├── config.rs       # config.toml + mcp.toml read/write
-        │   ├── budget.rs       # Daily spend tracking
-        │   └── types.rs        # Rust types, CortexConfig, ProviderKind
-        ├── commands/
-        │   ├── ai_commands.rs  # Tauri IPC: send_ai_query, get_budget_status
-        │   ├── pty_commands.rs # Tauri IPC: spawn_pty, write_pty, resize_pty
-        │   ├── chat_commands.rs
-        │   └── status_commands.rs
-        ├── pty.rs              # PTY manager (portable-pty, one thread per pane)
-        └── lib.rs              # Tauri app setup, state registration
+        │   ├── database.rs     # SQLite persistence
+        │   └── config.rs       # config.toml + mcp.toml
+        ├── commands/           # Tauri IPC handlers
+        ├── pty.rs              # PTY manager (one thread per pane)
+        └── lib.rs              # App setup, state registration
 ```
 
-**IPC contract.** The frontend never talks to AI providers directly. Every AI call goes through `send_ai_query` (Tauri command). The Rust backend owns all provider state, cost tracking, and verification. The frontend receives `cortex:ai:stream` events with typed `AiStreamEvent` payloads.
+### How it works
 
-**Threading model.** Each PTY pane runs a dedicated reader thread. AI calls run in `tokio::task::spawn_blocking` — they never block the PTY thread or the Tauri IPC thread. Streaming chunks are emitted to the frontend as they arrive.
+1. You type a query in the terminal input
+2. The router scores it (0-10) based on word signals
+3. Score 5+ goes to Claude, 3-4 to Sonnet, 0-2 to local Ollama
+4. The provider streams tokens back via `cortex:ai:stream` events
+5. Context (cwd, git, CLAUDE.md) is injected into every prompt automatically
+6. MCP tools are discovered on startup and injected into system prompts
 
-**Persistence.** SQLite via `rusqlite` (bundled). Two tables: `messages` (conversation history) and `cost_log` (per-query spend). Config is TOML on disk, loaded into `Arc<Mutex<CortexConfig>>` at startup and hot-reloaded on settings save.
+The frontend never talks to AI providers directly. Every call goes through Rust. The backend owns all provider state, cost tracking, and verification.
 
 ---
 
-## Roadmap
+## Stack
 
-- [ ] Shell integration hooks (precmd/preexec, command blocks, exit code detection)
-- [ ] AI-powered autocomplete as ghost text (Ollama 3B, Tab to accept)
-- [ ] Error autopsy — inline explanation on non-zero exit
-- [ ] Clickable file paths in terminal output (Cmd+click to open)
-- [ ] Markdown reader sidebar (Cmd+M, rendered inline)
-- [ ] Natural language mode (`#` prefix, translates to shell command)
-- [ ] Dangerous command guardrails (rm -rf, force push, DROP TABLE)
-- [ ] Linux support
-- [ ] Homebrew cask formula
-- [ ] Open source release
+| Layer | Technology |
+|---|---|
+| Desktop framework | Tauri 2.0 |
+| Backend | Rust |
+| Frontend | React 19 + TypeScript |
+| Terminal | xterm.js v6 (DOM renderer) |
+| Database | SQLite (rusqlite, bundled) |
+| Icons | lucide-react |
+| Math | KaTeX |
+| Build | Vite 8 + Cargo |
+| Package manager | pnpm |
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT
 
 ---
 
-Built by [Orel](https://github.com/Orellius) — [@Orellius](https://x.com/Orellius) on X — [orellius.ai](https://orellius.ai)
+Built by [Orel](https://github.com/Orellius) / [@Orellius](https://x.com/Orellius) on X / [orellius.ai](https://orellius.ai)
