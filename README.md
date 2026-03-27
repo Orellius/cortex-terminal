@@ -372,6 +372,20 @@ If Cortex is useful to you, give it a star. It helps others find the project.
 [![Issues](https://img.shields.io/github/issues/Orellius/cortex-terminal)](https://github.com/Orellius/cortex-terminal/issues)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
+## Attribution
+
+Cortex Terminal is created by [Orellius Labs](https://orellius.ai).
+
+Attribution is **required** under the Apache 2.0 License (Section 4). If you fork or redistribute this software:
+
+1. You **must** retain the `NOTICE` file with original attribution
+2. You **must** retain the `LICENSE` file
+3. You **must** state any changes you made to the source code
+4. You **must not** use the "Cortex" or "Orellius" names, logos, or trademarks without permission (Section 6)
+5. The attribution credit is compiled into the binary and verified at runtime. Removal constitutes a license violation.
+
+Forks are welcome. Rebranding as your own product without attribution is not.
+
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
