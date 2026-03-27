@@ -14,7 +14,10 @@ use commands::ai_commands::{
     check_providers, get_ai_config, get_budget_status, list_ollama_models, scan_ai_clis,
     send_ai_query, update_ai_config,
 };
-use commands::chat_commands::{add_message, create_conversation, get_messages, list_conversations};
+use commands::chat_commands::{
+    add_message, create_conversation, get_messages, list_conversations, restore_session,
+    save_session,
+};
 use commands::pty_commands::{kill_pty, resize_pty, spawn_pty, write_pty, PtyState};
 use commands::status_commands::{
     get_claude_usage, get_git_branch, get_home_dir, list_projects, open_external,
@@ -90,6 +93,7 @@ pub fn run() {
             scan_ai_clis, list_ollama_models,
             // Chat persistence
             create_conversation, add_message, get_messages, list_conversations,
+            save_session, restore_session,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

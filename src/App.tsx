@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type { JSX } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useHomeDir } from "./hooks/useHomeDir";
 import { useTabs } from "./hooks/useTabs";
 import { useStatusPoll } from "./hooks/useStatusPoll";
@@ -31,6 +32,23 @@ export function App(): JSX.Element {
   } = useTabs(homeDir);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
+
+  // Save session on window close
+  useEffect(() => {
+    const unlisten = getCurrentWindow().onCloseRequested(async () => {
+      if (tabs.length > 0) {
+        const sessionTabs = tabs.map((tab) => ({
+          tab_id: tab.id,
+          kind: tab.kind,
+          cwd: tab.cwd,
+          title: tab.title,
+          conversation_id: null,
+        }));
+        await invoke("save_session", { tabs: sessionTabs }).catch(() => {});
+      }
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [tabs]);
 
   // Per-tab terminal refs — keyed by tab id
   const terminalRefs = useRef<Map<string, React.RefObject<Terminal | null>>>(

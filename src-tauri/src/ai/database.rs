@@ -59,7 +59,18 @@ impl Database {
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
-            CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id, created_at);"
+            CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id, created_at);
+
+            CREATE TABLE IF NOT EXISTS session_tabs (
+                id TEXT PRIMARY KEY,
+                tab_id TEXT NOT NULL,
+                kind TEXT NOT NULL CHECK(kind IN ('ai', 'shell')),
+                cwd TEXT NOT NULL,
+                title TEXT NOT NULL,
+                conversation_id TEXT,
+                tab_order INTEGER NOT NULL DEFAULT 0,
+                saved_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );"
         ).context("migration failed")?;
 
         Ok(Self { conn: Mutex::new(conn) })
@@ -109,6 +120,47 @@ impl Database {
             rusqlite::params![key, value],
         ).context("failed to set setting")?;
         Ok(())
+    }
+
+    // ─── Session restore ──────────────────────────────────────
+
+    pub(crate) fn save_session_tabs(&self, tabs: &[SessionTab]) -> Result<()> {
+        let conn = self.conn.lock().map_err(|_| anyhow::anyhow!("db mutex poisoned"))?;
+        conn.execute("DELETE FROM session_tabs", []).context("clear session_tabs")?;
+        let now = chrono::Utc::now().to_rfc3339();
+        for (i, tab) in tabs.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO session_tabs (id, tab_id, kind, cwd, title, conversation_id, tab_order, saved_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                rusqlite::params![
+                    uuid::Uuid::new_v4().to_string(),
+                    tab.tab_id, tab.kind, tab.cwd, tab.title, tab.conversation_id,
+                    i as i64, now
+                ],
+            ).context("save session tab")?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn restore_session_tabs(&self) -> Result<Vec<SessionTab>> {
+        let conn = self.conn.lock().map_err(|_| anyhow::anyhow!("db mutex poisoned"))?;
+        let mut stmt = conn.prepare(
+            "SELECT tab_id, kind, cwd, title, conversation_id FROM session_tabs ORDER BY tab_order ASC"
+        ).context("prepare session_tabs")?;
+        let rows = stmt.query_map([], |row| {
+            Ok(SessionTab {
+                tab_id: row.get(0)?,
+                kind: row.get(1)?,
+                cwd: row.get(2)?,
+                title: row.get(3)?,
+                conversation_id: row.get(4)?,
+            })
+        }).context("query session_tabs")?;
+        let mut tabs = Vec::new();
+        for row in rows {
+            tabs.push(row.context("row parse")?);
+        }
+        Ok(tabs)
     }
 
     // ─── Conversation persistence ───────────────────────────────
@@ -239,4 +291,13 @@ pub(crate) struct ConversationEntry {
     pub tab_id: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct SessionTab {
+    pub tab_id: String,
+    pub kind: String,
+    pub cwd: String,
+    pub title: String,
+    pub conversation_id: Option<String>,
 }
