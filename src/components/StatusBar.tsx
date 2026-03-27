@@ -1,5 +1,6 @@
-import { useState, useEffect, type JSX } from "react";
+import { useState, useEffect, useRef, type JSX } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { ClaudeUsage } from "../types";
 
 interface ProviderStatus {
@@ -13,6 +14,17 @@ interface BudgetStatus {
   spent_today: number;
   limit: number;
   is_capped: boolean;
+}
+
+interface AiStreamEvent {
+  pane_id: string;
+  provider: string;
+  model: string;
+  chunk: string;
+  done: boolean;
+  cost: number;
+  duration_ms: number;
+  verified: boolean;
 }
 
 interface StatusBarProps {
@@ -34,10 +46,28 @@ const PROVIDER_ICONS: Record<string, string> = {
   ollama: "●",
 };
 
+const MODEL_SHORT: Record<string, string> = {
+  sonnet: "Sonnet",
+  opus: "Opus",
+  haiku: "Haiku",
+  "gemini-2.0-flash": "Flash",
+  "qwen3.5:35b-a3b": "Qwen 35B",
+  "nemotron-cascade-2": "Cascade",
+};
+
 function usageColor(pct: number): string {
   if (pct >= 80) return "#f43f5e";
   if (pct >= 50) return "#f59e0b";
   return "#52525b";
+}
+
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  if (hours > 0) return `${hours}h${String(minutes % 60).padStart(2, "0")}m`;
+  if (minutes > 0) return `${minutes}m${String(seconds % 60).padStart(2, "0")}s`;
+  return `${seconds}s`;
 }
 
 export function StatusBar({
@@ -48,7 +78,13 @@ export function StatusBar({
 }: StatusBarProps): JSX.Element {
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [budget, setBudget] = useState<BudgetStatus>({ spent_today: 0, limit: 5, is_capped: false });
+  const [activeModel, setActiveModel] = useState<{ provider: string; model: string } | null>(null);
+  const [sessionElapsed, setSessionElapsed] = useState(0);
+  const [linesAdded, setLinesAdded] = useState(0);
+  const [linesRemoved] = useState(0);
+  const sessionStart = useRef(Date.now());
 
+  // Poll providers + budget
   useEffect(() => {
     const check = () => {
       invoke<ProviderStatus[]>("check_providers").then(setProviders).catch(() => {});
@@ -57,6 +93,35 @@ export function StatusBar({
     check();
     const interval = setInterval(check, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Session timer — tick every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSessionElapsed(Date.now() - sessionStart.current);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Listen for AI stream events — track active model + line counts
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    listen<AiStreamEvent>("cortex:ai:stream", (event) => {
+      const d = event.payload;
+      if (!d.done) {
+        // Model is currently processing
+        setActiveModel({ provider: d.provider, model: d.model });
+      } else {
+        // Count lines in response
+        const lines = d.chunk.split("\n").length;
+        setLinesAdded((prev) => prev + lines);
+        // Clear active model after short delay
+        setTimeout(() => setActiveModel(null), 1500);
+      }
+    }).then((fn) => { unlisten = fn; });
+
+    return () => { unlisten?.(); };
   }, []);
 
   const costStr = budget.spent_today > 0 ? `$${budget.spent_today.toFixed(3)}` : "$0";
@@ -78,27 +143,28 @@ export function StatusBar({
         fontVariantNumeric: "tabular-nums",
       }}
     >
-      {/* Git branch badge */}
+      {/* Git branch */}
       {branch !== "—" && branch && (
         <Badge color="#52525b" borderColor="rgba(255,255,255,0.06)">
           {branch}
         </Badge>
       )}
 
-      {/* Action buttons */}
+      {/* Actions */}
       <ActionBtn onClick={onOpenLauncher} title="Cmd+K">Projects</ActionBtn>
       <ActionBtn onClick={onOpenSettings} title="Cmd+,">Settings</ActionBtn>
 
-      {/* Model badges — with connection status dot */}
+      {/* Model badges */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
         {providers.map((p) => {
           const color = PROVIDER_COLORS[p.kind] ?? "#52525b";
           const icon = PROVIDER_ICONS[p.kind] ?? "○";
+          const isActive = activeModel?.provider === p.kind;
           return (
             <Badge
               key={p.kind}
               color={p.available ? color : "#27272a"}
-              borderColor={p.available ? `${color}33` : "rgba(255,255,255,0.04)"}
+              borderColor={isActive ? color : p.available ? `${color}33` : "rgba(255,255,255,0.04)"}
               title={`${p.name}: ${p.available ? p.model : "offline"}`}
             >
               <span
@@ -109,6 +175,8 @@ export function StatusBar({
                   background: p.available ? color : "#27272a",
                   display: "inline-block",
                   flexShrink: 0,
+                  // Pulse when active
+                  animation: isActive ? "pulse 1s infinite" : "none",
                 }}
               />
               <span style={{ fontSize: "0.625rem" }}>{icon}</span>
@@ -118,10 +186,36 @@ export function StatusBar({
         })}
       </div>
 
+      {/* Active model indicator — shows which model is currently responding */}
+      {activeModel && (
+        <Badge
+          color={PROVIDER_COLORS[activeModel.provider] ?? "#52525b"}
+          borderColor={`${PROVIDER_COLORS[activeModel.provider] ?? "#52525b"}44`}
+        >
+          <span style={{ fontSize: "0.625rem" }}>
+            {PROVIDER_ICONS[activeModel.provider] ?? "○"}
+          </span>
+          {MODEL_SHORT[activeModel.model] ?? activeModel.model}
+          <span style={{ color: "#52525b", fontSize: "0.5625rem" }}>typing</span>
+        </Badge>
+      )}
+
       {/* Spacer */}
       <span style={{ flex: 1 }} />
 
-      {/* API Cost — labeled with cloud icon */}
+      {/* Lines added/removed */}
+      {(linesAdded > 0 || linesRemoved > 0) && (
+        <Badge color="#52525b" borderColor="rgba(255,255,255,0.06)">
+          {linesAdded > 0 && (
+            <span style={{ color: "#10b981" }}>+{linesAdded}</span>
+          )}
+          {linesRemoved > 0 && (
+            <span style={{ color: "#f43f5e" }}>-{linesRemoved}</span>
+          )}
+        </Badge>
+      )}
+
+      {/* Cost */}
       <Badge
         color={budget.is_capped ? "#f43f5e" : "#3f3f46"}
         borderColor={budget.is_capped ? "rgba(244,63,94,0.2)" : "rgba(255,255,255,0.06)"}
@@ -133,7 +227,7 @@ export function StatusBar({
         )}
       </Badge>
 
-      {/* Claude session/weekly — labeled clearly */}
+      {/* Claude usage */}
       <Badge color="#8b5cf6" borderColor="rgba(139,92,246,0.15)">
         <span style={{ fontSize: "0.625rem" }}>◆</span>
         <span style={{ color: "#52525b", fontSize: "0.5625rem" }}>session</span>
@@ -146,11 +240,16 @@ export function StatusBar({
           {Math.round(usage.weekly_pct)}%
         </span>
       </Badge>
+
+      {/* Session time */}
+      <Badge color="#3f3f46" borderColor="rgba(255,255,255,0.06)">
+        {formatDuration(sessionElapsed)}
+      </Badge>
     </div>
   );
 }
 
-// ─── Reusable Badge Component ────────────────────────────────
+// ─── Badge ───────────────────────────────────────────────────
 
 interface BadgeProps {
   children: React.ReactNode;
