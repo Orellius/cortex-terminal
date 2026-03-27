@@ -126,7 +126,7 @@ export function SettingsOverlay({ onClose }: SettingsOverlayProps): JSX.Element 
           ) : active === "models" ? (
             <ModelsTab config={config} onSave={handleSave} saving={saving} />
           ) : active === "providers" ? (
-            <ProvidersTab config={config} onSave={handleSave} saving={saving} />
+            <ProvidersTab />
           ) : active === "routing" ? (
             <RoutingInfo />
           ) : active === "budget" ? (

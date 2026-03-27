@@ -1,297 +1,145 @@
-import { useState, useCallback, useEffect, type JSX } from "react";
+import { useState, useEffect, useCallback, type JSX } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-interface CortexConfig {
-  claude_model: string;
-  gemini_model: string;
-  gemini_api_key: string | null;
-  ollama_model: string;
-  ollama_endpoint: string;
-  daily_budget_usd: number;
-}
-
-interface ProviderStatus {
+interface ProviderEntry {
   name: string;
-  kind: string;
-  available: boolean;
-  model: string;
+  endpoint: string;
+  api_key_env: string;
+  api_key: string | null;
+  models: string[];
+  enabled: boolean;
+  format: string;
+  extra_headers: [string, string][];
 }
 
-interface OllamaModel {
-  name: string;
-  size: string;
-  modified_at: string;
-}
+const MONO: React.CSSProperties = { fontFamily: '"Geist Mono", Menlo, monospace' };
 
-interface ProvidersTabProps {
-  config: CortexConfig;
-  onSave: (config: CortexConfig) => Promise<void>;
-  saving: boolean;
-}
-
-const CLAUDE_MODELS = ["sonnet", "opus", "haiku"];
-const GEMINI_MODELS = ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"];
-
-const FIELD_STYLE: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "0.25rem",
-};
-
-const LABEL_STYLE: React.CSSProperties = {
-  fontSize: "0.6875rem",
-  fontFamily: '"Geist Mono", Menlo, monospace',
-  color: "#71717a",
-  fontWeight: 500,
-};
-
-const INPUT_STYLE: React.CSSProperties = {
-  background: "rgba(255, 255, 255, 0.03)",
-  border: "1px solid rgba(255, 255, 255, 0.08)",
-  borderRadius: "0.375rem",
-  padding: "0.5rem 0.625rem",
-  color: "#e4e4e7",
-  fontFamily: '"Geist Mono", Menlo, monospace',
-  fontSize: "0.75rem",
-  outline: "none",
-  width: "100%",
-};
-
-const BTN_STYLE: React.CSSProperties = {
-  background: "#e4e4e7",
-  color: "#09090b",
-  border: "none",
-  borderRadius: "0.375rem",
-  padding: "0.4rem 0.75rem",
-  fontFamily: '"Geist Mono", Menlo, monospace',
-  fontSize: "0.6875rem",
-  fontWeight: 600,
-  cursor: "pointer",
-  transition: "opacity 100ms",
-};
-
-const SELECT_STYLE: React.CSSProperties = {
-  ...INPUT_STYLE,
-  appearance: "none" as const,
-  cursor: "pointer",
-};
-
-const BTN_SECONDARY: React.CSSProperties = {
-  ...BTN_STYLE,
-  background: "transparent",
-  color: "#a1a1aa",
-  border: "1px solid rgba(255, 255, 255, 0.08)",
-  fontWeight: 400,
-};
-
-export function ProvidersTab({ config, onSave, saving }: ProvidersTabProps): JSX.Element {
-  const [claudeModel, setClaudeModel] = useState(config.claude_model);
-  const [geminiModel, setGeminiModel] = useState(config.gemini_model);
-  const [geminiKey, setGeminiKey] = useState(config.gemini_api_key ?? "");
-  const [ollamaModel, setOllamaModel] = useState(config.ollama_model);
-  const [ollamaEndpoint, setOllamaEndpoint] = useState(config.ollama_endpoint);
-  const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
-  const [testResults, setTestResults] = useState<Record<string, string | null>>({});
+export function ProvidersTab(): JSX.Element {
+  const [providers, setProviders] = useState<ProviderEntry[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState("");
 
   useEffect(() => {
-    invoke<OllamaModel[]>("list_ollama_models")
-      .then(setOllamaModels)
-      .catch(() => {});
+    invoke<ProviderEntry[]>("get_provider_registry").then(setProviders).catch(() => {});
   }, []);
 
-  const handleSave = useCallback(() => {
-    onSave({
-      ...config,
-      claude_model: claudeModel,
-      gemini_model: geminiModel,
-      gemini_api_key: geminiKey.trim() || null,
-      ollama_model: ollamaModel,
-      ollama_endpoint: ollamaEndpoint,
-    });
-  }, [config, claudeModel, geminiModel, geminiKey, ollamaModel, ollamaEndpoint, onSave]);
+  const toggleProvider = useCallback((name: string) => {
+    setProviders((prev) =>
+      prev.map((p) => (p.name === name ? { ...p, enabled: !p.enabled } : p))
+    );
+  }, []);
 
-  const testConnection = useCallback(async (kind: string) => {
-    setTestResults((prev) => ({ ...prev, [kind]: "testing..." }));
+  const setApiKey = useCallback((name: string, key: string) => {
+    setProviders((prev) =>
+      prev.map((p) => (p.name === name ? { ...p, api_key: key || null } : p))
+    );
+  }, []);
+
+  const save = useCallback(async () => {
+    setSaving(true);
     try {
-      const statuses = await invoke<ProviderStatus[]>("check_providers");
-      const status = statuses.find((s) => s.kind === kind);
-      setTestResults((prev) => ({
-        ...prev,
-        [kind]: status?.available ? "connected" : "offline",
-      }));
+      await invoke("save_provider_registry", { providers });
+      setSaveMsg("saved");
+      setTimeout(() => setSaveMsg(""), 2000);
     } catch {
-      setTestResults((prev) => ({ ...prev, [kind]: "error" }));
+      setSaveMsg("error");
+    } finally {
+      setSaving(false);
     }
-  }, []);
+  }, [providers]);
 
-  const statusColor = (result: string | null | undefined): string => {
-    if (!result) return "#52525b";
-    if (result === "connected") return "#10b981";
-    if (result === "testing...") return "#f59e0b";
-    return "#f43f5e";
-  };
+  const cloudProviders = providers.filter((p) => !p.endpoint.includes("localhost"));
+  const localProviders = providers.filter((p) => p.endpoint.includes("localhost"));
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-      {/* Claude */}
-      <ProviderSection
-        icon="◆"
-        name="Claude"
-        color="#8b5cf6"
-        description="Code execution via Claude CLI. Install: npm i -g @anthropic-ai/claude-code"
-      >
-        <div style={FIELD_STYLE}>
-          <label style={LABEL_STYLE}>Model</label>
-          <select
-            style={SELECT_STYLE}
-            value={claudeModel}
-            onChange={(e) => setClaudeModel(e.target.value)}
-          >
-            {CLAUDE_MODELS.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ ...MONO, fontSize: "0.875rem", fontWeight: 600, color: "#e4e4e7" }}>Providers</div>
+          <div style={{ ...MONO, fontSize: "0.5625rem", color: "#3f3f46", marginTop: "0.125rem" }}>
+            {providers.filter((p) => p.enabled).length} enabled / {providers.length} total. Config: ~/.cortex/providers.toml
+          </div>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          <button style={BTN_SECONDARY} onClick={() => testConnection("claude")}>
-            Test
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          {saveMsg && <span style={{ ...MONO, fontSize: "0.5625rem", color: saveMsg === "saved" ? "#10b981" : "#f43f5e" }}>{saveMsg}</span>}
+          <button onClick={save} disabled={saving} style={{ ...MONO, fontSize: "0.625rem", fontWeight: 600, background: "#e4e4e7", color: "#010101", border: "none", borderRadius: "0.25rem", padding: "0.3rem 0.625rem", cursor: "pointer" }}>
+            {saving ? "..." : "Save"}
           </button>
-          {testResults.claude && (
-            <span style={{ fontSize: "0.6875rem", fontFamily: '"Geist Mono", Menlo, monospace', color: statusColor(testResults.claude) }}>
-              {testResults.claude}
-            </span>
-          )}
         </div>
-      </ProviderSection>
-
-      {/* Gemini */}
-      <ProviderSection
-        icon="◈"
-        name="Gemini"
-        color="#0ea5e9"
-        description="Research via Gemini API. Free tier: 15 RPM"
-      >
-        <div style={FIELD_STYLE}>
-          <label style={LABEL_STYLE}>Model</label>
-          <select
-            style={SELECT_STYLE}
-            value={geminiModel}
-            onChange={(e) => setGeminiModel(e.target.value)}
-          >
-            {GEMINI_MODELS.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-        </div>
-        <div style={FIELD_STYLE}>
-          <label style={LABEL_STYLE}>API Key</label>
-          <input
-            style={INPUT_STYLE}
-            type="password"
-            value={geminiKey}
-            onChange={(e) => setGeminiKey(e.target.value)}
-            placeholder="AIza..."
-          />
-        </div>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          <button style={BTN_SECONDARY} onClick={() => testConnection("gemini")}>
-            Test
-          </button>
-          {testResults.gemini && (
-            <span style={{ fontSize: "0.6875rem", fontFamily: '"Geist Mono", Menlo, monospace', color: statusColor(testResults.gemini) }}>
-              {testResults.gemini}
-            </span>
-          )}
-        </div>
-      </ProviderSection>
-
-      {/* Ollama */}
-      <ProviderSection
-        icon="●"
-        name="Local (Ollama)"
-        color="#10b981"
-        description="Free local models via Ollama. Install: ollama.com"
-      >
-        <div style={FIELD_STYLE}>
-          <label style={LABEL_STYLE}>Model</label>
-          <select
-            style={SELECT_STYLE}
-            value={ollamaModel}
-            onChange={(e) => setOllamaModel(e.target.value)}
-          >
-            {ollamaModels.length > 0 ? (
-              ollamaModels.map((m) => (
-                <option key={m.name} value={m.name}>{m.name} ({m.size})</option>
-              ))
-            ) : (
-              <option value={ollamaModel}>{ollamaModel}</option>
-            )}
-          </select>
-        </div>
-        <div style={FIELD_STYLE}>
-          <label style={LABEL_STYLE}>Endpoint</label>
-          <input
-            style={INPUT_STYLE}
-            value={ollamaEndpoint}
-            onChange={(e) => setOllamaEndpoint(e.target.value)}
-            placeholder="http://localhost:11434"
-          />
-        </div>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          <button style={BTN_SECONDARY} onClick={() => testConnection("ollama")}>
-            Test
-          </button>
-          {testResults.ollama && (
-            <span style={{ fontSize: "0.6875rem", fontFamily: '"Geist Mono", Menlo, monospace', color: statusColor(testResults.ollama) }}>
-              {testResults.ollama}
-            </span>
-          )}
-        </div>
-      </ProviderSection>
-
-      {/* Save */}
-      <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: "0.25rem" }}>
-        <button style={{ ...BTN_STYLE, opacity: saving ? 0.5 : 1 }} onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save"}
-        </button>
       </div>
+
+      {/* Cloud */}
+      <div style={{ ...MONO, fontSize: "0.5625rem", color: "#3f3f46", textTransform: "uppercase", letterSpacing: "0.05em" }}>Cloud</div>
+      {cloudProviders.map((p) => (
+        <ProviderRow key={p.name} provider={p} onToggle={toggleProvider} onSetKey={setApiKey} />
+      ))}
+
+      {/* Local */}
+      <div style={{ ...MONO, fontSize: "0.5625rem", color: "#3f3f46", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: "0.5rem" }}>Local (free)</div>
+      {localProviders.map((p) => (
+        <ProviderRow key={p.name} provider={p} onToggle={toggleProvider} onSetKey={setApiKey} />
+      ))}
     </div>
   );
 }
 
-interface ProviderSectionProps {
-  icon: string;
-  name: string;
-  color: string;
-  description: string;
-  children: React.ReactNode;
-}
+function ProviderRow({ provider, onToggle, onSetKey }: {
+  provider: ProviderEntry;
+  onToggle: (name: string) => void;
+  onSetKey: (name: string, key: string) => void;
+}): JSX.Element {
+  const [showKey, setShowKey] = useState(false);
+  const isLocal = provider.endpoint.includes("localhost");
+  const hasKey = provider.api_key_env && !isLocal;
 
-function ProviderSection({ icon, name, color, description, children }: ProviderSectionProps): JSX.Element {
   return (
-    <div
-      style={{
-        padding: "0.75rem",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
-        borderRadius: "0.375rem",
-        background: "rgba(255, 255, 255, 0.02)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.625rem",
-      }}
-    >
-      <div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.375rem", marginBottom: "0.125rem" }}>
-          <span style={{ color, fontSize: "0.75rem" }}>{icon}</span>
-          <span style={{ color, fontWeight: 600, fontSize: "0.75rem", fontFamily: '"Geist Mono", Menlo, monospace' }}>
-            {name}
+    <div style={{
+      display: "flex", flexDirection: "column", gap: "0.375rem",
+      padding: "0.5rem 0.625rem", borderLeft: `2px solid ${provider.enabled ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)"}`,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <button onClick={() => onToggle(provider.name)} style={{
+          background: "none", border: "none", cursor: "pointer", padding: 0,
+          fontSize: "0.625rem", color: provider.enabled ? "#10b981" : "#27272a",
+        }}>
+          {provider.enabled ? "●" : "○"}
+        </button>
+        <span style={{ ...MONO, fontSize: "0.6875rem", color: provider.enabled ? "#e4e4e7" : "#52525b", fontWeight: 500 }}>
+          {provider.name}
+        </span>
+        {provider.models.length > 0 && (
+          <span style={{ ...MONO, fontSize: "0.5rem", color: "#27272a" }}>
+            {provider.models.slice(0, 3).join(", ")}{provider.models.length > 3 ? ` +${provider.models.length - 3}` : ""}
           </span>
-        </div>
-        <div style={{ fontSize: "0.625rem", color: "#52525b", fontFamily: '"Geist Mono", Menlo, monospace' }}>
-          {description}
-        </div>
+        )}
+        {isLocal && <span style={{ ...MONO, fontSize: "0.5rem", color: "#10b981" }}>free</span>}
       </div>
-      {children}
+
+      {hasKey && (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.375rem", paddingLeft: "1.125rem" }}>
+          <span style={{ ...MONO, fontSize: "0.5rem", color: "#3f3f46", minWidth: "5rem" }}>{provider.api_key_env}</span>
+          {showKey ? (
+            <input
+              value={provider.api_key ?? ""}
+              onChange={(e) => onSetKey(provider.name, e.target.value)}
+              placeholder="paste key or set env var"
+              style={{
+                ...MONO, flex: 1, fontSize: "0.5625rem", background: "transparent",
+                border: "1px solid rgba(255,255,255,0.06)", borderRadius: "0.1875rem",
+                padding: "0.1875rem 0.375rem", color: "#a1a1aa", outline: "none",
+              }}
+            />
+          ) : (
+            <button onClick={() => setShowKey(true)} style={{
+              ...MONO, fontSize: "0.5rem", background: "none",
+              border: "1px solid rgba(255,255,255,0.06)", borderRadius: "0.1875rem",
+              padding: "0.125rem 0.375rem", color: "#3f3f46", cursor: "pointer",
+            }}>
+              {provider.api_key ? "***configured" : "set key"}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
