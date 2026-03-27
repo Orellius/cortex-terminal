@@ -1,6 +1,7 @@
 import ReactDOM from "react-dom/client";
 import { App } from "./App";
 import "./styles/globals.css";
+import "katex/dist/katex.min.css";
 
 async function mount() {
   await document.fonts.ready;

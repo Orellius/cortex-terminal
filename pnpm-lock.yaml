@@ -23,6 +23,9 @@ importers:
       '@xterm/xterm':
         specifier: ^6.0.0
         version: 6.0.0
+      katex:
+        specifier: ^0.16.43
+        version: 0.16.43
       lucide-react:
         specifier: ^1.7.0
         version: 1.7.0(react@19.2.4)
@@ -39,6 +42,9 @@ importers:
       '@tauri-apps/cli':
         specifier: ^2.10.1
         version: 2.10.1
+      '@types/katex':
+        specifier: ^0.16.8
+        version: 0.16.8
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.14
@@ -371,6 +377,9 @@ packages:
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
 
+  '@types/katex@0.16.8':
+    resolution: {integrity: sha512-trgaNyfU+Xh2Tc+ABIb44a5AYUpicB3uwirOioeOkNPPbmgRNtcWyDeeFRzjPZENO9Vq8gvVqfhaaXWLlevVwg==}
+
   '@types/react-dom@19.2.3':
     resolution: {integrity: sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==}
     peerDependencies:
@@ -400,6 +409,10 @@ packages:
 
   '@xterm/xterm@6.0.0':
     resolution: {integrity: sha512-TQwDdQGtwwDt+2cgKDLn0IRaSxYu1tSUjgKarSDkUM0ZNiSRXFpjxEsvc/Zgc5kq5omJ+V0a8/kIM2WD3sMOYg==}
+
+  commander@8.3.0:
+    resolution: {integrity: sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww==}
+    engines: {node: '>= 12'}
 
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
@@ -431,6 +444,10 @@ packages:
 
   jiti@2.6.1:
     resolution: {integrity: sha512-ekilCSN1jwRvIbgeg/57YFh8qQDNbwDb9xT/qu2DAHbFFZUicIl4ygVaAvzveMhMVr3LnpSKTNnwt8PoOfmKhQ==}
+    hasBin: true
+
+  katex@0.16.43:
+    resolution: {integrity: sha512-K7NL5JtGrFEglipOAjY4UYA69CnTuNmjArxeXF6+bw7h2OGySUPv6QWRjfb1gmutJ4Mw/qLeBqiROOEDULp4nA==}
     hasBin: true
 
   lightningcss-android-arm64@1.32.0:
@@ -837,6 +854,8 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
+  '@types/katex@0.16.8': {}
+
   '@types/react-dom@19.2.3(@types/react@19.2.14)':
     dependencies:
       '@types/react': 19.2.14
@@ -855,6 +874,8 @@ snapshots:
   '@xterm/addon-search@0.16.0': {}
 
   '@xterm/xterm@6.0.0': {}
+
+  commander@8.3.0: {}
 
   csstype@3.2.3: {}
 
@@ -875,6 +896,10 @@ snapshots:
   graceful-fs@4.2.11: {}
 
   jiti@2.6.1: {}
+
+  katex@0.16.43:
+    dependencies:
+      commander: 8.3.0
 
   lightningcss-android-arm64@1.32.0:
     optional: true

@@ -1,5 +1,6 @@
 import { useState, useCallback, type JSX } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import katex from "katex";
 
 export interface ChatMessage {
   id: string;
@@ -193,7 +194,38 @@ function renderMarkdown(text: string): string {
     if (/^\s*[-*]\s/.test(line)) processed = processed.replace(/^\s*[-*]\s/, "  - ");
     result.push(processed);
   }
-  return result.join("<br>");
+  return renderLatex(result.join("<br>"));
+}
+
+/** Render LaTeX math notation via KaTeX */
+function renderLatex(html: string): string {
+  // Display math: \[...\] or $$...$$  (may span multiple lines via <br>)
+  let output = html.replace(
+    /\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$/g,
+    (_match, g1: string | undefined, g2: string | undefined) => {
+      const tex = (g1 ?? g2 ?? "").replace(/<br\s*\/?>/g, "\n").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+      try {
+        return `<div style="margin:0.5rem 0;overflow-x:auto">${katex.renderToString(tex.trim(), { displayMode: true, throwOnError: false })}</div>`;
+      } catch {
+        return `<pre style="color:#71717a">${tex}</pre>`;
+      }
+    }
+  );
+
+  // Inline math: \(...\) or $...$  (single $ must not be currency — require backslash content)
+  output = output.replace(
+    /\\\((.+?)\\\)/g,
+    (_match, tex: string) => {
+      const cleaned = tex.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+      try {
+        return katex.renderToString(cleaned.trim(), { displayMode: false, throwOnError: false });
+      } catch {
+        return cleaned;
+      }
+    }
+  );
+
+  return output;
 }
 
 function escapeHtml(text: string): string {
