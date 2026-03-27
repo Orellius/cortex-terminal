@@ -29,9 +29,12 @@
 | **Slash commands + markdown** | **Rich markdown rendering** |
 | ![Slash](docs/screenshots/05-rich-markdown.png) | ![Markdown](docs/screenshots/06-markdown-sidebar.png) |
 | `/help`, tables, code blocks, LaTeX | Headers, bullets, inline code, bold |
-| **Markdown preview sidebar** | |
-| ![Preview](docs/screenshots/07-markdown-preview.png) | |
-| `/preview` opens rich .md viewer, click any .md file to open | |
+| **Markdown preview sidebar** | **Settings (9 pages)** |
+| ![Preview](docs/screenshots/07-markdown-preview.png) | ![Settings](docs/screenshots/08-settings.png) |
+| `/preview` opens rich .md viewer, click any .md file to open | Models, Providers (26+), Routing, Budget, Permissions, MCP, Appearance |
+| **Project launcher** | |
+| ![Projects](docs/screenshots/09-projects.png) | |
+| Cmd+K to switch projects, Browse for any directory, Recents tab | |
 
 ---
 
