@@ -397,7 +397,33 @@ export function AiChatView({ paneId, isActive, cwd, showSearch, onCloseSearch }:
       </div>
 
       {/* Fixed input at bottom */}
-      <AiChatInput onSubmit={handleSubmit} disabled={thinking !== null} />
+      <AiChatInput
+        onSubmit={handleSubmit}
+        disabled={thinking !== null}
+        onSlashCommand={(cmd, _args) => {
+          if (cmd === "/clear") {
+            setMessages([]);
+          } else if (cmd === "/help") {
+            setMessages((prev) => [...prev, {
+              id: crypto.randomUUID(), role: "assistant", provider: "system", model: "cortex",
+              content: "Commands: /clear /settings /search /palette /help /model /budget\nPrefixes: ! shell · c: claude · s: sonnet · l: local",
+              timestamp: Date.now(),
+            }]);
+          } else if (cmd === "/model") {
+            setMessages((prev) => [...prev, {
+              id: crypto.randomUUID(), role: "assistant", provider: "system", model: "cortex",
+              content: "Routing: score 5+ → Claude, 3-4 → Sonnet, 0-2 → Local\nForce: c: s: l: prefixes",
+              timestamp: Date.now(),
+            }]);
+          } else {
+            setMessages((prev) => [...prev, {
+              id: crypto.randomUUID(), role: "assistant", provider: "system", model: "cortex",
+              content: `Unknown command: ${cmd}`,
+              timestamp: Date.now(),
+            }]);
+          }
+        }}
+      />
 
       {/* Markdown sidebar */}
       <MarkdownSidebar

@@ -2,15 +2,26 @@ import { useState, useRef, useCallback, useEffect, type JSX } from "react";
 
 interface AiChatInputProps {
   onSubmit: (text: string) => void;
+  onSlashCommand?: (command: string, args: string) => void;
   disabled: boolean;
 }
 
-/** IDE-like input editor with multi-line, auto-close, line numbers */
-export function AiChatInput({ onSubmit, disabled }: AiChatInputProps): JSX.Element {
+const SLASH_COMMANDS = [
+  { cmd: "/clear", description: "Clear chat history" },
+  { cmd: "/settings", description: "Open settings" },
+  { cmd: "/search", description: "Search in chat" },
+  { cmd: "/palette", description: "Open command palette" },
+  { cmd: "/help", description: "Show available commands" },
+  { cmd: "/model", description: "Show current model info" },
+  { cmd: "/budget", description: "Show budget status" },
+];
+
+export function AiChatInput({ onSubmit, onSlashCommand, disabled }: AiChatInputProps): JSX.Element {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isMultiline = value.includes("\n");
   const lineCount = value.split("\n").length;
+  const showSlashHints = value.startsWith("/") && !value.includes(" ") && value.length < 12;
 
   useEffect(() => {
     if (!disabled) textareaRef.current?.focus();
@@ -19,31 +30,39 @@ export function AiChatInput({ onSubmit, disabled }: AiChatInputProps): JSX.Eleme
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
     if (trimmed.length === 0 || disabled) return;
+
+    // Slash command handling
+    if (trimmed.startsWith("/")) {
+      const parts = trimmed.split(/\s+/);
+      const cmd = parts[0];
+      const args = parts.slice(1).join(" ");
+      onSlashCommand?.(cmd, args);
+      setValue("");
+      return;
+    }
+
     onSubmit(trimmed);
     setValue("");
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
-  }, [value, disabled, onSubmit]);
+    // Reset height for multi-line
+    if (textareaRef.current) textareaRef.current.style.height = "";
+  }, [value, disabled, onSubmit, onSlashCommand]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      // Cmd+Enter always submits
       if (e.key === "Enter" && e.metaKey) {
         e.preventDefault();
         handleSubmit();
         return;
       }
-
-      // Enter: submit if single line, newline if multi-line
       if (e.key === "Enter" && !e.shiftKey && !e.metaKey) {
         if (!isMultiline) {
           e.preventDefault();
           handleSubmit();
         }
-        // else: default behavior (newline)
         return;
       }
 
-      // Auto-close brackets and quotes
+      // Auto-close brackets
       const pairs: Record<string, string> = { "(": ")", "[": "]", "{": "}", '"': '"', "'": "'", "`": "`" };
       if (pairs[e.key]) {
         const el = textareaRef.current;
@@ -51,33 +70,16 @@ export function AiChatInput({ onSubmit, disabled }: AiChatInputProps): JSX.Eleme
           const start = el.selectionStart;
           const end = el.selectionEnd;
           if (start !== end) {
-            // Wrap selection
             e.preventDefault();
             const selected = value.slice(start, end);
             const wrapped = `${e.key}${selected}${pairs[e.key]}`;
             const next = value.slice(0, start) + wrapped + value.slice(end);
             setValue(next);
-            requestAnimationFrame(() => {
-              el.selectionStart = start + 1;
-              el.selectionEnd = end + 1;
-            });
-          } else if (e.key !== "'" && e.key !== '"') {
-            // Insert pair (skip for quotes if preceded by alphanumeric)
-            const charBefore = start > 0 ? value[start - 1] : "";
-            if (!/\w/.test(charBefore)) {
-              e.preventDefault();
-              const next = value.slice(0, start) + e.key + pairs[e.key] + value.slice(end);
-              setValue(next);
-              requestAnimationFrame(() => {
-                el.selectionStart = start + 1;
-                el.selectionEnd = start + 1;
-              });
-            }
+            requestAnimationFrame(() => { el.selectionStart = start + 1; el.selectionEnd = end + 1; });
           }
         }
       }
 
-      // Tab → insert 2 spaces
       if (e.key === "Tab") {
         e.preventDefault();
         const el = textareaRef.current;
@@ -85,124 +87,106 @@ export function AiChatInput({ onSubmit, disabled }: AiChatInputProps): JSX.Eleme
           const start = el.selectionStart;
           const next = value.slice(0, start) + "  " + value.slice(el.selectionEnd);
           setValue(next);
-          requestAnimationFrame(() => {
-            el.selectionStart = start + 2;
-            el.selectionEnd = start + 2;
-          });
+          requestAnimationFrame(() => { el.selectionStart = start + 2; el.selectionEnd = start + 2; });
         }
       }
     },
     [handleSubmit, isMultiline, value]
   );
 
-  const handleInput = useCallback(() => {
+  // Only auto-resize when actually multi-line
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    setValue(newValue);
     const el = textareaRef.current;
     if (!el) return;
-    // Reset to 1-line height then expand to content — use minHeight to prevent jump
-    el.style.height = "1.5rem";
-    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+    if (newValue.includes("\n")) {
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+    } else {
+      el.style.height = "";
+    }
   }, []);
 
+  const matchingCommands = showSlashHints
+    ? SLASH_COMMANDS.filter((c) => c.cmd.startsWith(value))
+    : [];
+
   return (
-    <div>
-      <div
-        style={{
-          borderTop: "1px solid rgba(255, 255, 255, 0.06)",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
-          background: "transparent",
-          overflow: "hidden",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "flex-start" }}>
-          {/* Line numbers (only in multi-line mode) */}
-          {isMultiline && (
+    <div style={{ position: "relative" }}>
+      {/* Slash command hints */}
+      {matchingCommands.length > 0 && (
+        <div style={{
+          position: "absolute", bottom: "100%", left: 0, right: 0,
+          background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)",
+          borderBottom: "none", borderRadius: "0.375rem 0.375rem 0 0",
+          padding: "0.25rem 0",
+        }}>
+          {matchingCommands.map((cmd) => (
             <div
+              key={cmd.cmd}
+              onClick={() => { setValue(cmd.cmd + " "); textareaRef.current?.focus(); }}
               style={{
-                padding: "0.625rem 0 0.625rem 0.5rem",
-                fontFamily: '"Geist Mono", Menlo, monospace',
-                fontSize: "0.6875rem",
-                color: "#27272a",
-                lineHeight: 1.5,
-                textAlign: "right",
-                minWidth: "1.5rem",
-                userSelect: "none",
-                fontVariantNumeric: "tabular-nums",
+                padding: "0.25rem 0.625rem", cursor: "pointer",
+                display: "flex", justifyContent: "space-between",
+                fontFamily: '"Geist Mono", Menlo, monospace', fontSize: "0.6875rem",
               }}
             >
+              <span style={{ color: "#a1a1aa" }}>{cmd.cmd}</span>
+              <span style={{ color: "#3f3f46" }}>{cmd.description}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "transparent" }}>
+        <div style={{ display: "flex", alignItems: "flex-start" }}>
+          {isMultiline && (
+            <div style={{
+              padding: "0.625rem 0 0.625rem 0.5rem",
+              fontFamily: '"Geist Mono", Menlo, monospace', fontSize: "0.6875rem",
+              color: "#27272a", lineHeight: 1.5, textAlign: "right",
+              minWidth: "1.5rem", userSelect: "none", fontVariantNumeric: "tabular-nums",
+            }}>
               {Array.from({ length: lineCount }, (_, i) => (
                 <div key={i}>{i + 1}</div>
               ))}
             </div>
           )}
 
-          {/* > arrow (single-line only) */}
           {!isMultiline && (
-            <span
-              style={{
-                color: "#3f3f46",
-                fontFamily: '"Geist Mono", Menlo, monospace',
-                fontSize: "0.875rem",
-                lineHeight: "1.5rem",
-                flexShrink: 0,
-                padding: "0.625rem 0 0 0.625rem",
-              }}
-            >
+            <span style={{
+              color: "#3f3f46", fontFamily: '"Geist Mono", Menlo, monospace',
+              fontSize: "0.875rem", lineHeight: "2.5rem", flexShrink: 0,
+              paddingLeft: "0.625rem",
+            }}>
               &gt;
             </span>
           )}
 
-          {/* Input */}
           <textarea
             ref={textareaRef}
             value={value}
-            onChange={(e) => {
-              setValue(e.target.value);
-              handleInput();
-            }}
+            onChange={handleChange}
             onKeyDown={handleKeyDown}
             disabled={disabled}
             placeholder={disabled ? "Thinking..." : "Ask Cortex anything..."}
             rows={1}
             style={{
-              flex: 1,
-              background: "transparent",
-              border: "none",
-              outline: "none",
+              flex: 1, background: "transparent", border: "none", outline: "none",
               color: "#e4e4e7",
-              fontFamily: isMultiline
-                ? '"Geist Mono", Menlo, monospace'
-                : '"Geist Sans", -apple-system, sans-serif',
-              fontSize: "0.8125rem",
-              lineHeight: 1.5,
-              resize: "none",
-              overflow: "hidden",
-              padding: "0.625rem",
-              margin: 0,
-              tabSize: 2,
+              fontFamily: '"Geist Mono", Menlo, monospace',
+              fontSize: "0.8125rem", lineHeight: isMultiline ? 1.5 : "2.5rem",
+              height: isMultiline ? undefined : "2.5rem",
+              resize: "none", overflow: "hidden",
+              padding: isMultiline ? "0.625rem" : "0 0.5rem",
+              margin: 0, tabSize: 2,
             }}
           />
-        </div>
-
-        {/* Footer hints */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            padding: "0 0.625rem 0.375rem",
-            fontFamily: '"Geist Mono", Menlo, monospace',
-            fontSize: "0.5rem",
-            color: "rgba(255, 255, 255, 0.2)",
-          }}
-        >
-          <span>
-            {isMultiline ? "Cmd+Enter to send" : "Enter to send"}
-            {!isMultiline && " · Shift+Enter for newline"}
-          </span>
-          <span>
-            {value.length > 0 && `${value.length} chars`}
-          </span>
         </div>
       </div>
     </div>
   );
 }
+
+export { SLASH_COMMANDS };
