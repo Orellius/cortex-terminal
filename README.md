@@ -362,9 +362,19 @@ The frontend never talks to AI providers directly. Every call goes through Rust.
 
 ---
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. Good first issues are labeled and ready to pick up.
+
+If Cortex is useful to you, give it a star. It helps others find the project.
+
+[![Star on GitHub](https://img.shields.io/github/stars/Orellius/cortex-terminal?style=social)](https://github.com/Orellius/cortex-terminal)
+[![Issues](https://img.shields.io/github/issues/Orellius/cortex-terminal)](https://github.com/Orellius/cortex-terminal/issues)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+
 ## License
 
-MIT
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 ---
 

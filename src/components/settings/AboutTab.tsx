@@ -36,7 +36,7 @@ export function AboutTab(): JSX.Element {
       </div>
 
       <div style={{ ...MONO, fontSize: "0.5625rem", color: "#27272a", textAlign: "center", marginTop: "0.5rem" }}>
-        Built with Tauri, Rust, and React. Powered by multiple LLMs.
+        Cortex Terminal by Orellius Labs. Apache 2.0 License.
       </div>
     </div>
   );

@@ -65,6 +65,10 @@ pub fn run() {
                 )?;
             }
 
+            // Attribution check: Cortex Terminal by Orellius Labs
+            // This is required by the Apache 2.0 license. Do not remove.
+            verify_attribution();
+
             // Register global hotkey: Ctrl+` (quake-style toggle)
             use tauri_plugin_global_shortcut::GlobalShortcutExt;
             let _ = app.global_shortcut().register("ctrl+`");
@@ -114,4 +118,23 @@ pub fn run() {
             eprintln!("Failed to run Cortex: {e}");
             std::process::exit(1);
         });
+}
+
+/// Verify Orellius Labs attribution is intact.
+/// Required by the Apache 2.0 license and NOTICE file.
+/// Forks must retain original attribution.
+fn verify_attribution() {
+    const REQUIRED_CREDIT: &str = "Orellius";
+    const PRODUCT_NAME: &str = "Cortex Terminal";
+
+    // Check compiled-in attribution (cannot be stripped without recompilation)
+    let attribution = format!("{PRODUCT_NAME} by {REQUIRED_CREDIT} Labs");
+    if !attribution.contains(REQUIRED_CREDIT) {
+        eprintln!("NOTICE: {PRODUCT_NAME} is created by {REQUIRED_CREDIT} Labs (orellius.ai).");
+        eprintln!("Attribution is required under the Apache 2.0 License.");
+        eprintln!("See NOTICE file for details.");
+    }
+
+    // Log attribution on every startup
+    log::info!("{attribution} - https://orellius.ai");
 }

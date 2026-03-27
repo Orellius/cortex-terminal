@@ -1,0 +1,15 @@
+Cortex Terminal
+Copyright 2026 Orellius Labs (Orel Ohayon)
+
+This product includes software developed at Orellius Labs (https://orellius.ai).
+
+Cortex Terminal is an AI-first multi-model terminal built with Tauri 2.0, Rust,
+React 19, and xterm.js. It provides multi-model AI routing, MCP tool bridging,
+and a native terminal experience in one interface.
+
+Third-party components:
+- Tauri (MIT/Apache 2.0) - https://tauri.app
+- React (MIT) - https://react.dev
+- xterm.js (MIT) - https://xtermjs.org
+- KaTeX (MIT) - https://katex.org
+- Lucide React (ISC) - https://lucide.dev
