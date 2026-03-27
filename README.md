@@ -29,6 +29,9 @@
 | **Slash commands + markdown** | **Rich markdown rendering** |
 | ![Slash](docs/screenshots/05-rich-markdown.png) | ![Markdown](docs/screenshots/06-markdown-sidebar.png) |
 | `/help`, tables, code blocks, LaTeX | Headers, bullets, inline code, bold |
+| **Markdown preview sidebar** | |
+| ![Preview](docs/screenshots/07-markdown-preview.png) | |
+| `/preview` opens rich .md viewer, click any .md file to open | |
 
 ---
 
