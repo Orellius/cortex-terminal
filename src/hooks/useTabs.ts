@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { Tab, TabKind, Pane, SplitDirection } from "../types";
 
 interface UseTabsResult {
@@ -42,9 +43,38 @@ export function useTabs(homeDir: string): UseTabsResult {
   useEffect(() => {
     if (!homeDir || initialized.current) return;
     initialized.current = true;
-    const first = makeTab(homeDir, "ai");
-    setTabs([first]);
-    setActiveTabId(first.id);
+
+    // Try to restore previous session
+    invoke<Array<{ tab_id: string; kind: string; cwd: string; title: string }>>("restore_session")
+      .then((saved) => {
+        if (saved.length > 0) {
+          const restored: Tab[] = saved.map((s) => {
+            const kind = (s.kind === "shell" ? "shell" : "ai") as TabKind;
+            const pane: Pane = { id: s.tab_id, kind, cwd: s.cwd || homeDir };
+            return {
+              id: s.tab_id,
+              title: s.title || (kind === "ai" ? "AI" : s.cwd),
+              cwd: s.cwd || homeDir,
+              kind,
+              panes: [pane],
+              activePaneId: pane.id,
+              splitDirection: null,
+            };
+          });
+          setTabs(restored);
+          setActiveTabId(restored[0].id);
+          return;
+        }
+        // No saved session, create default
+        const first = makeTab(homeDir, "ai");
+        setTabs([first]);
+        setActiveTabId(first.id);
+      })
+      .catch(() => {
+        const first = makeTab(homeDir, "ai");
+        setTabs([first]);
+        setActiveTabId(first.id);
+      });
   }, [homeDir]);
 
   const addTab = useCallback(

@@ -70,11 +70,11 @@ export function McpTab(): JSX.Element {
     setNewName(""); setNewCommand(""); setNewArgs(""); setShowAdd(false);
   }, [newName, newCommand, newArgs, servers, persist]);
 
-  const importFromClaude = useCallback(async () => {
+  const importFrom = useCallback(async (command: string) => {
     setImporting(true); setImportMsg("");
     try {
-      const imported = await invoke<McpServer[]>("import_mcp_from_claude_config");
-      if (imported.length === 0) { setImportMsg("No MCP servers found in Claude config"); return; }
+      const imported = await invoke<McpServer[]>(command);
+      if (imported.length === 0) { setImportMsg("No MCP servers found"); return; }
       const existing = new Set(servers.map((s) => s.name));
       const newServers = imported.filter((s) => !existing.has(s.name));
       if (newServers.length === 0) { setImportMsg("All servers already imported"); return; }
@@ -100,8 +100,11 @@ export function McpTab(): JSX.Element {
 
       {/* Actions */}
       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-        <button style={BTN_SEC} onClick={importFromClaude} disabled={importing}>
+        <button style={BTN_SEC} onClick={() => importFrom("import_mcp_from_claude_config")} disabled={importing}>
           {importing ? "Reading..." : "Import from Claude Code"}
+        </button>
+        <button style={BTN_SEC} onClick={() => importFrom("import_mcp_from_cursor_config")} disabled={importing}>
+          Import from Cursor
         </button>
         <button style={BTN} onClick={() => setShowAdd(true)}>Add Server</button>
         {importMsg && <span style={{ ...MONO, fontSize: "0.5625rem", color: importMsg.includes("Imported") ? "#10b981" : "#f59e0b" }}>{importMsg}</span>}

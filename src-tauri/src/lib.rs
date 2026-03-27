@@ -13,7 +13,8 @@ use ai::database::Database;
 use ai::types::CortexConfig;
 use commands::ai_commands::{
     call_mcp_tool, check_providers, get_ai_config, get_budget_status, get_mcp_servers,
-    get_mcp_tools, import_mcp_from_claude_config, list_ollama_models, save_mcp_servers,
+    get_mcp_tools, import_mcp_from_claude_config, import_mcp_from_cursor_config,
+    list_ollama_models, save_mcp_servers,
     scan_ai_clis, send_ai_query, start_mcp_bridge, stop_mcp_bridge, update_ai_config,
 };
 use commands::chat_commands::{
@@ -108,7 +109,7 @@ pub fn run() {
             check_providers, send_ai_query, get_ai_config, update_ai_config, get_budget_status,
             scan_ai_clis, list_ollama_models,
             // MCP config
-            get_mcp_servers, save_mcp_servers, import_mcp_from_claude_config,
+            get_mcp_servers, save_mcp_servers, import_mcp_from_claude_config, import_mcp_from_cursor_config,
             // MCP bridge
             start_mcp_bridge, stop_mcp_bridge, get_mcp_tools, call_mcp_tool,
             // Chat persistence

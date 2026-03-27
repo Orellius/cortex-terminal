@@ -65,6 +65,7 @@ pub(crate) async fn send_ai_query(
     app: AppHandle,
     config_state: State<'_, Arc<std::sync::Mutex<CortexConfig>>>,
     db: State<'_, Arc<Database>>,
+    mcp: State<'_, McpBridgeState>,
 ) -> Result<(), String> {
     let config = config_state.lock().map_err(|_| "config mutex poisoned")?.clone();
 
@@ -110,6 +111,16 @@ pub(crate) async fn send_ai_query(
         .map(|m| (m.role.clone(), m.content.clone()))
         .collect();
 
+    // Get MCP tools block for prompt injection
+    let mcp_arc = Arc::clone(&mcp);
+    let mcp_tools = {
+        let bridge = mcp_arc.lock().ok();
+        bridge.map(|b| b.tools_prompt_block()).filter(|s| !s.is_empty())
+    };
+
+    // Check permission mode
+    let perm_mode = config.permission_mode.clone();
+
     // Execute in background with streaming — never block the IPC thread
     let chunk_app = app.clone();
     let chunk_pane = pane_id.clone();
@@ -137,7 +148,8 @@ pub(crate) async fn send_ai_query(
 
         let result = providers::execute_streaming(
             &query_owned, provider, &model, &config,
-            cwd_owned.as_deref(), &history_context, on_chunk, None,
+            cwd_owned.as_deref(), &history_context, on_chunk,
+            mcp_tools.as_deref(),
         );
         let duration_ms = start.elapsed().as_millis() as u64;
 
@@ -230,6 +242,13 @@ pub(crate) async fn save_mcp_servers(
 #[tauri::command]
 pub(crate) async fn import_mcp_from_claude_config() -> Result<Vec<config::McpServerEntry>, String> {
     tokio::task::spawn_blocking(|| config::import_mcp_from_claude().map_err(to_err))
+        .await
+        .map_err(|e| format!("task failed: {e}"))?
+}
+
+#[tauri::command]
+pub(crate) async fn import_mcp_from_cursor_config() -> Result<Vec<config::McpServerEntry>, String> {
+    tokio::task::spawn_blocking(|| config::import_mcp_from_cursor().map_err(to_err))
         .await
         .map_err(|e| format!("task failed: {e}"))?
 }

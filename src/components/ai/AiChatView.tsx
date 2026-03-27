@@ -318,12 +318,17 @@ export function AiChatView({ paneId, isActive, cwd, showSearch, onCloseSearch, o
   // Listen for CLI bridge queries (cortex cli ask "...")
   useEffect(() => {
     if (!isActive) return;
-    let unlisten: (() => void) | undefined;
+    let unlistenAsk: (() => void) | undefined;
+    let unlistenPreview: (() => void) | undefined;
     listen<{ query: string }>("cortex:cli:ask", (event) => {
       handleSubmit(event.payload.query);
-    }).then((fn) => { unlisten = fn; });
-    return () => { unlisten?.(); };
-  }, [isActive, handleSubmit]);
+    }).then((fn) => { unlistenAsk = fn; });
+    // CLI preview command opens markdown sidebar
+    listen<{ path: string }>("cortex:cli:preview", (event) => {
+      openMarkdownFile(event.payload.path);
+    }).then((fn) => { unlistenPreview = fn; });
+    return () => { unlistenAsk?.(); unlistenPreview?.(); };
+  }, [isActive, handleSubmit, openMarkdownFile]);
 
   return (
     <div

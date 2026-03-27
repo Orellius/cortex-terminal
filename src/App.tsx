@@ -74,17 +74,27 @@ export function App(): JSX.Element {
   const pasteHistory = usePasteHistory();
   const { toasts, addToast, dismissToast } = useToasts();
 
-  // Check for Ollama model updates on mount
+  // Startup checks: providers, MCP, model updates
   useEffect(() => {
-    const checkUpdates = async () => {
+    const startup = async () => {
+      // Check providers
       try {
-        const models = await invoke<Array<{ name: string; size: string }>>( "list_ollama_models");
-        if (models.length > 0) {
-          // Simple version check — in production, compare with Ollama API for newer versions
+        const statuses = await invoke<Array<{ name: string; available: boolean }>>("check_providers");
+        const available = statuses.filter((s) => s.available).map((s) => s.name);
+        if (available.length > 0) {
+          addToast({ title: "Providers ready", body: available.join(", "), type: "info", autoDismissMs: 3000 });
         }
-      } catch { /* Ollama not running */ }
+      } catch { /* ignore */ }
+
+      // Start MCP bridge
+      try {
+        const tools = await invoke<Array<{ name: string; server: string }>>("start_mcp_bridge");
+        if (tools.length > 0) {
+          addToast({ title: "MCP tools loaded", body: `${tools.length} tools from ${new Set(tools.map((t) => t.server)).size} server(s)`, type: "info", autoDismissMs: 4000 });
+        }
+      } catch { /* no MCP servers configured */ }
     };
-    const timer = setTimeout(checkUpdates, 5000); // Check 5s after launch
+    const timer = setTimeout(startup, 2000);
     return () => clearTimeout(timer);
   }, [addToast]);
 

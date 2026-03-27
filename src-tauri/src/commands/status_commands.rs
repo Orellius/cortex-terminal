@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use serde::Serialize;
 use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 use std::fs;
+use tauri::State;
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ClaudeUsage {
@@ -64,7 +67,16 @@ pub(crate) fn get_git_branch(cwd: String) -> Result<String, String> {
 pub(crate) async fn execute_shell(
     command: String,
     cwd: Option<String>,
+    config_state: State<'_, Arc<std::sync::Mutex<crate::ai::types::CortexConfig>>>,
 ) -> Result<ShellResult, String> {
+    // Permission enforcement
+    let mode = {
+        let cfg = config_state.lock().map_err(|_| "config mutex poisoned")?;
+        cfg.permission_mode.clone()
+    };
+    if mode == "safe" {
+        return Err("Shell execution blocked: permission mode is 'safe'. Change to 'ask' or 'auto' in Settings > Permissions.".to_string());
+    }
     let work_dir = cwd
         .or_else(|| std::env::current_dir().ok().map(|p| p.to_string_lossy().to_string()))
         .unwrap_or_else(|| "/tmp".to_string());
