@@ -60,6 +60,7 @@ pub(crate) async fn send_ai_query(
     query: String,
     pane_id: String,
     conversation_id: Option<String>,
+    cwd: Option<String>,
     app: AppHandle,
     config_state: State<'_, Arc<std::sync::Mutex<CortexConfig>>>,
     db: State<'_, Arc<Database>>,
@@ -84,6 +85,12 @@ pub(crate) async fn send_ai_query(
     let query_owned = clean_query.to_string();
     let pane_owned = pane_id.clone();
     let db_arc = Arc::clone(&db);
+    // If cwd is home dir or missing, use the actual launch directory instead
+    let home = std::env::var("HOME").unwrap_or_default();
+    let cwd_owned = match cwd {
+        Some(ref dir) if dir != &home && !dir.is_empty() => Some(dir.clone()),
+        _ => std::env::current_dir().ok().map(|p| p.to_string_lossy().to_string()),
+    };
 
     // Load conversation history for context (last 20 messages max)
     let history = conversation_id
@@ -102,11 +109,35 @@ pub(crate) async fn send_ai_query(
         .map(|m| (m.role.clone(), m.content.clone()))
         .collect();
 
-    // Execute in background — never block the IPC thread
+    // Execute in background with streaming — never block the IPC thread
+    let chunk_app = app.clone();
+    let chunk_pane = pane_id.clone();
+    let chunk_model = model.clone();
+
     tokio::task::spawn_blocking(move || {
         let start = std::time::Instant::now();
 
-        let result = providers::execute(&query_owned, provider, &model, &config, None, &history_context);
+        // Streaming callback — emits each chunk to frontend as it arrives
+        let on_chunk = |text: &str| {
+            let _ = chunk_app.emit(
+                "cortex:ai:stream",
+                AiStreamEvent {
+                    pane_id: chunk_pane.clone(),
+                    provider,
+                    model: chunk_model.clone(),
+                    chunk: text.to_string(),
+                    done: false,
+                    cost: 0.0,
+                    duration_ms: 0,
+                    verified: true,
+                },
+            );
+        };
+
+        let result = providers::execute_streaming(
+            &query_owned, provider, &model, &config,
+            cwd_owned.as_deref(), &history_context, on_chunk,
+        );
         let duration_ms = start.elapsed().as_millis() as u64;
 
         let (content, cost, verified) = match result {
@@ -114,7 +145,6 @@ pub(crate) async fn send_ai_query(
                 let check = verification::verify(&output, &query_owned);
                 let cost = estimate_cost(provider, &output);
 
-                // Log cost
                 let _ = db_arc.log_cost(&CostEntry {
                     provider: provider.to_string(),
                     model: model.clone(),
@@ -133,6 +163,7 @@ pub(crate) async fn send_ai_query(
             Err(e) => (format!("error: {e}"), 0.0, false),
         };
 
+        // Final event with full verified content + stats
         let _ = app.emit(
             "cortex:ai:stream",
             AiStreamEvent {
@@ -177,6 +208,29 @@ pub(crate) async fn get_budget_status(
 ) -> Result<BudgetStatus, String> {
     let config = config_state.lock().map_err(|_| "config mutex poisoned")?;
     db.get_budget_status(config.daily_budget_usd).map_err(to_err)
+}
+
+// ─── MCP Config Commands ────────────────────────────────────
+
+#[tauri::command]
+pub(crate) async fn get_mcp_servers() -> Result<Vec<config::McpServerEntry>, String> {
+    let mcp = config::load_mcp_config().map_err(to_err)?;
+    Ok(mcp.servers)
+}
+
+#[tauri::command]
+pub(crate) async fn save_mcp_servers(
+    servers: Vec<config::McpServerEntry>,
+) -> Result<(), String> {
+    let mcp = config::McpConfig { servers };
+    config::save_mcp_config(&mcp).map_err(to_err)
+}
+
+#[tauri::command]
+pub(crate) async fn import_mcp_from_claude_config() -> Result<Vec<config::McpServerEntry>, String> {
+    tokio::task::spawn_blocking(|| config::import_mcp_from_claude().map_err(to_err))
+        .await
+        .map_err(|e| format!("task failed: {e}"))?
 }
 
 /// Rough cost estimation per provider.

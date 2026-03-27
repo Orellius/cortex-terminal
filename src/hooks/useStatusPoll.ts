@@ -35,7 +35,7 @@ export function useStatusPoll(cwd: string): StatusPollResult {
 
   useEffect(() => {
     pollStatus();
-    const id = setInterval(pollStatus, 10_000);
+    const id = setInterval(pollStatus, 60_000); // 60s to avoid API rate limits
     return () => clearInterval(id);
   }, [pollStatus]);
 

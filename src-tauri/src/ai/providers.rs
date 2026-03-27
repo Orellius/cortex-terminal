@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::io::{BufRead, Read, Write};
 use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result};
@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use super::brain;
 use super::types::{CortexConfig, ProviderKind};
 
-/// Execute a query with conversation history and shared .cortex/ brain.
+/// Execute a query (blocking, no streaming). Wraps execute_streaming with a no-op callback.
 pub(crate) fn execute(
     query: &str,
     provider: ProviderKind,
@@ -15,31 +15,58 @@ pub(crate) fn execute(
     cwd: Option<&str>,
     history: &[(String, String)],
 ) -> Result<String> {
+    execute_streaming(query, provider, model, config, cwd, history, |_| {})
+}
+
+/// Execute a query with streaming support.
+/// Calls `on_chunk` for each token/line as it arrives.
+/// Returns the full accumulated response.
+pub(crate) fn execute_streaming(
+    query: &str,
+    provider: ProviderKind,
+    model: &str,
+    config: &CortexConfig,
+    cwd: Option<&str>,
+    history: &[(String, String)],
+    on_chunk: impl Fn(&str),
+) -> Result<String> {
     let system = brain::load_system_prompt();
     let project_ctx = brain::load_project_context(cwd).unwrap_or_default();
+    let env_ctx = cwd.map(brain::load_env_context).unwrap_or_default();
+
+    let combined_ctx = match (env_ctx.is_empty(), project_ctx.is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => env_ctx,
+        (true, false) => project_ctx,
+        (false, false) => format!("{env_ctx}\n\n{project_ctx}"),
+    };
 
     match provider {
-        ProviderKind::Claude => execute_claude(query, model, &system, &project_ctx, history),
-        ProviderKind::Gemini => {
-            let key = config.gemini_api_key.as_deref()
-                .ok_or_else(|| anyhow::anyhow!("Gemini API key not configured"))?;
-            execute_gemini(query, model, key, &system, &project_ctx, history)
+        ProviderKind::Claude => {
+            stream_claude(query, model, &system, &combined_ctx, history, &on_chunk)
         }
-        ProviderKind::Ollama => execute_ollama(query, model, &config.ollama_endpoint, &system, &project_ctx, history),
+        ProviderKind::Gemini => {
+            let key = config
+                .gemini_api_key
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("Gemini API key not configured"))?;
+            execute_gemini(query, model, key, &system, &combined_ctx, history)
+        }
+        ProviderKind::Ollama => {
+            stream_ollama(query, model, &config.ollama_endpoint, &system, &combined_ctx, history, &on_chunk)
+        }
     }
 }
 
 pub(crate) fn is_available(provider: ProviderKind, config: &CortexConfig) -> bool {
     match provider {
-        ProviderKind::Claude => {
-            Command::new("/opt/homebrew/bin/claude")
-                .arg("--version")
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()
-                .map(|s| s.success())
-                .unwrap_or(false)
-        }
+        ProviderKind::Claude => Command::new("/opt/homebrew/bin/claude")
+            .arg("--version")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false),
         ProviderKind::Gemini => config.gemini_api_key.is_some(),
         ProviderKind::Ollama => {
             reqwest::blocking::get(format!("{}/api/tags", config.ollama_endpoint))
@@ -49,20 +76,21 @@ pub(crate) fn is_available(provider: ProviderKind, config: &CortexConfig) -> boo
     }
 }
 
-/// Claude via CLI — pass history as conversation context in the prompt
-fn execute_claude(
+// ─── Claude CLI — streaming stdout ──────────────────────────
+
+fn stream_claude(
     query: &str,
     model: &str,
     system: &str,
-    project_ctx: &str,
+    ctx: &str,
     history: &[(String, String)],
+    on_chunk: &impl Fn(&str),
 ) -> Result<String> {
     let history_block = format_history_text(history);
-
-    let full_prompt = if project_ctx.is_empty() {
+    let full_prompt = if ctx.is_empty() {
         format!("{system}\n\n---\n{history_block}User: {query}")
     } else {
-        format!("{system}\n\n---\nProject context:\n{project_ctx}\n\n---\n{history_block}User: {query}")
+        format!("{system}\n\n---\nProject context:\n{ctx}\n\n---\n{history_block}User: {query}")
     };
 
     let mut child = Command::new("/opt/homebrew/bin/claude")
@@ -73,21 +101,150 @@ fn execute_claude(
         .spawn()
         .context("failed to spawn claude CLI")?;
 
+    // Write prompt then close stdin
     if let Some(mut stdin) = child.stdin.take() {
         stdin.write_all(full_prompt.as_bytes()).context("write failed")?;
     }
 
-    let output = child.wait_with_output().context("claude wait failed")?;
-    parse_output(&output.stdout, &output.stderr, output.status.success(), "claude")
+    // Drain stderr in background thread to prevent pipe deadlock
+    let stderr_pipe = child.stderr.take();
+    let stderr_handle = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(mut err) = stderr_pipe {
+            let _ = err.read_to_end(&mut buf);
+        }
+        String::from_utf8_lossy(&buf).to_string()
+    });
+
+    // Stream stdout incrementally
+    let stdout = child.stdout.take().context("no stdout")?;
+    let mut reader = std::io::BufReader::new(stdout);
+    let mut full_output = String::new();
+    let mut buf = [0u8; 512];
+
+    loop {
+        let n = reader.read(&mut buf).context("stdout read failed")?;
+        if n == 0 {
+            break;
+        }
+        let chunk = String::from_utf8_lossy(&buf[..n]);
+        full_output.push_str(&chunk);
+        on_chunk(&chunk);
+    }
+
+    let status = child.wait().context("claude wait failed")?;
+    let stderr_out = stderr_handle.join().unwrap_or_default();
+
+    if !status.success() {
+        let detail = if stderr_out.trim().is_empty() {
+            "exit error"
+        } else {
+            stderr_out.trim()
+        };
+        anyhow::bail!("claude: {detail}");
+    }
+
+    if full_output.trim().is_empty() {
+        Ok(format!("[no output] {}", stderr_out.trim()))
+    } else {
+        Ok(full_output)
+    }
 }
 
-/// Gemini via API — use proper multi-turn chat format
+// ─── Ollama — NDJSON streaming ──────────────────────────────
+
+fn stream_ollama(
+    query: &str,
+    model: &str,
+    endpoint: &str,
+    system: &str,
+    ctx: &str,
+    history: &[(String, String)],
+    on_chunk: &impl Fn(&str),
+) -> Result<String> {
+    let mut messages = Vec::new();
+
+    let sys_text = if ctx.is_empty() {
+        system.to_string()
+    } else {
+        format!("{system}\n\nProject context:\n{ctx}")
+    };
+    messages.push(serde_json::json!({ "role": "system", "content": sys_text }));
+
+    for (role, content) in history {
+        messages.push(serde_json::json!({ "role": role, "content": content }));
+    }
+    messages.push(serde_json::json!({ "role": "user", "content": query }));
+
+    let body = serde_json::json!({
+        "model": model,
+        "messages": messages,
+        "stream": true,
+    });
+
+    let resp = reqwest::blocking::Client::new()
+        .post(format!("{endpoint}/api/chat"))
+        .json(&body)
+        .send()
+        .context("ollama request failed")?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let raw = resp.text().context("ollama read body failed")?;
+        let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap_or_default();
+        let detail = parsed["error"].as_str().unwrap_or(&raw);
+        anyhow::bail!("ollama ({status}): {detail}");
+    }
+
+    // Read NDJSON stream — each line is a JSON object with message.content
+    let mut reader = std::io::BufReader::new(resp);
+    let mut full_output = String::new();
+    let mut line_buf = String::new();
+
+    loop {
+        line_buf.clear();
+        let bytes = reader.read_line(&mut line_buf).context("ollama stream read failed")?;
+        if bytes == 0 {
+            break;
+        }
+
+        let trimmed = line_buf.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let parsed: serde_json::Value = match serde_json::from_str(trimmed) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        if parsed["done"].as_bool() == Some(true) {
+            break;
+        }
+
+        if let Some(token) = parsed["message"]["content"].as_str() {
+            if !token.is_empty() {
+                full_output.push_str(token);
+                on_chunk(token);
+            }
+        }
+    }
+
+    if full_output.trim().is_empty() {
+        anyhow::bail!("ollama: empty response");
+    }
+
+    Ok(full_output)
+}
+
+// ─── Gemini (blocking, removed from product) ────────────────
+
 fn execute_gemini(
     query: &str,
     model: &str,
     api_key: &str,
     system: &str,
-    project_ctx: &str,
+    ctx: &str,
     history: &[(String, String)],
 ) -> Result<String> {
     let url = format!(
@@ -95,38 +252,20 @@ fn execute_gemini(
         model, api_key
     );
 
-    // Build multi-turn contents array
     let mut contents = Vec::new();
-
-    // System instruction as first user message
-    let sys_text = if project_ctx.is_empty() {
+    let sys_text = if ctx.is_empty() {
         system.to_string()
     } else {
-        format!("{system}\n\nProject context:\n{project_ctx}")
+        format!("{system}\n\nProject context:\n{ctx}")
     };
-    contents.push(serde_json::json!({
-        "role": "user",
-        "parts": [{ "text": sys_text }]
-    }));
-    contents.push(serde_json::json!({
-        "role": "model",
-        "parts": [{ "text": "Understood. I am Cortex." }]
-    }));
+    contents.push(serde_json::json!({"role":"user","parts":[{"text":sys_text}]}));
+    contents.push(serde_json::json!({"role":"model","parts":[{"text":"Understood. I am Cortex."}]}));
 
-    // Conversation history
     for (role, content) in history {
         let gemini_role = if role == "user" { "user" } else { "model" };
-        contents.push(serde_json::json!({
-            "role": gemini_role,
-            "parts": [{ "text": content }]
-        }));
+        contents.push(serde_json::json!({"role":gemini_role,"parts":[{"text":content}]}));
     }
-
-    // Current query
-    contents.push(serde_json::json!({
-        "role": "user",
-        "parts": [{ "text": query }]
-    }));
+    contents.push(serde_json::json!({"role":"user","parts":[{"text":query}]}));
 
     let body = serde_json::json!({
         "contents": contents,
@@ -150,71 +289,8 @@ fn execute_gemini(
     }
 }
 
-/// Ollama via /api/chat — proper multi-turn chat format
-fn execute_ollama(
-    query: &str,
-    model: &str,
-    endpoint: &str,
-    system: &str,
-    project_ctx: &str,
-    history: &[(String, String)],
-) -> Result<String> {
-    // Build messages array for chat API
-    let mut messages = Vec::new();
+// ─── Helpers ────────────────────────────────────────────────
 
-    // System message
-    let sys_text = if project_ctx.is_empty() {
-        system.to_string()
-    } else {
-        format!("{system}\n\nProject context:\n{project_ctx}")
-    };
-    messages.push(serde_json::json!({ "role": "system", "content": sys_text }));
-
-    // Conversation history
-    for (role, content) in history {
-        messages.push(serde_json::json!({ "role": role, "content": content }));
-    }
-
-    // Current query
-    messages.push(serde_json::json!({ "role": "user", "content": query }));
-
-    let body = serde_json::json!({
-        "model": model,
-        "messages": messages,
-        "stream": false,
-    });
-
-    // Use /api/chat instead of /api/generate for multi-turn
-    let resp = reqwest::blocking::Client::new()
-        .post(format!("{endpoint}/api/chat"))
-        .json(&body)
-        .send()
-        .context("ollama request failed")?;
-
-    let status = resp.status();
-    let raw = resp.text().context("ollama read body failed")?;
-
-    if !status.is_success() {
-        let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap_or_default();
-        let detail = parsed["error"].as_str().unwrap_or(&raw);
-        anyhow::bail!("ollama ({status}): {detail}");
-    }
-
-    let parsed: serde_json::Value = serde_json::from_str(&raw)
-        .context("ollama json parse failed")?;
-
-    // /api/chat returns message.content instead of response
-    if let Some(text) = parsed["message"]["content"].as_str() {
-        Ok(text.to_string())
-    } else if let Some(text) = parsed["response"].as_str() {
-        // Fallback for /api/generate format
-        Ok(text.to_string())
-    } else {
-        anyhow::bail!("ollama: no content in: {}", &raw[..raw.len().min(200)])
-    }
-}
-
-/// Format history as plain text for providers that need it (Claude CLI)
 fn format_history_text(history: &[(String, String)]) -> String {
     if history.is_empty() {
         return String::new();
@@ -222,7 +298,6 @@ fn format_history_text(history: &[(String, String)]) -> String {
     let mut out = String::from("Conversation history:\n");
     for (role, content) in history {
         let label = if role == "user" { "User" } else { "Cortex" };
-        // Truncate very long messages in history to save tokens
         let trimmed = if content.len() > 500 {
             format!("{}...", &content[..500])
         } else {
@@ -232,13 +307,4 @@ fn format_history_text(history: &[(String, String)]) -> String {
     }
     out.push_str("\n---\n");
     out
-}
-
-fn parse_output(stdout: &[u8], stderr: &[u8], success: bool, name: &str) -> Result<String> {
-    let out = String::from_utf8_lossy(stdout).to_string();
-    let err = String::from_utf8_lossy(stderr).to_string();
-    if !success {
-        anyhow::bail!("{name}: {}", if err.trim().is_empty() { "exit error" } else { err.trim() });
-    }
-    if out.trim().is_empty() { Ok(format!("[no output] {}", err.trim())) } else { Ok(out) }
 }

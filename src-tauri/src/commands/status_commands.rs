@@ -58,10 +58,56 @@ pub(crate) fn get_git_branch(cwd: String) -> Result<String, String> {
     Ok(branch)
 }
 
+/// Execute a shell command and return stdout + stderr.
+/// Used for `!` prefix commands in the AI chat.
+#[tauri::command]
+pub(crate) async fn execute_shell(
+    command: String,
+    cwd: Option<String>,
+) -> Result<ShellResult, String> {
+    let work_dir = cwd
+        .or_else(|| std::env::current_dir().ok().map(|p| p.to_string_lossy().to_string()))
+        .unwrap_or_else(|| "/tmp".to_string());
+
+    tokio::task::spawn_blocking(move || {
+        let output = Command::new("/bin/zsh")
+            .args(["-c", &command])
+            .current_dir(&work_dir)
+            .output()
+            .map_err(|e| format!("shell error: {e}"))?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+        Ok(ShellResult {
+            stdout,
+            stderr,
+            exit_code: output.status.code().unwrap_or(-1),
+        })
+    })
+    .await
+    .map_err(|e| format!("task failed: {e}"))?
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ShellResult {
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: i32,
+}
+
 /// Returns the user's home directory path.
 #[tauri::command]
 pub(crate) async fn get_home_dir() -> Result<String, String> {
     std::env::var("HOME").map_err(|e| format!("HOME not set: {e}"))
+}
+
+/// Returns the directory Cortex was launched from (process cwd).
+#[tauri::command]
+pub(crate) async fn get_launch_dir() -> Result<String, String> {
+    std::env::current_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .map_err(|e| format!("cwd error: {e}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -172,10 +218,10 @@ fn fetch_usage(token: &str) -> Option<ClaudeUsage> {
 pub(crate) fn get_claude_usage() -> Result<ClaudeUsage, String> {
     let token = match read_keychain_token() {
         Some(t) => t,
-        None => return Ok(ClaudeUsage::default()),
+        None => return Err("no keychain token".to_string()),
     };
 
-    Ok(fetch_usage(&token).unwrap_or_default())
+    fetch_usage(&token).ok_or_else(|| "usage fetch failed (rate limited or network error)".to_string())
 }
 
 // ---------------------------------------------------------------------------

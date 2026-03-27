@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type JSX } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { FolderOpen, Settings } from "lucide-react";
 import type { ClaudeUsage } from "../types";
 
 interface BudgetStatus {
@@ -126,7 +127,8 @@ export function StatusBar({
         alignItems: "center",
         gap: "0.375rem",
         padding: "0 0.75rem",
-        background: "transparent",
+        background: "#010101",
+        borderTop: "1px solid rgba(255, 255, 255, 0.04)",
         fontFamily: '"Geist Mono", Menlo, monospace',
         fontSize: "0.6875rem",
         color: "#3f3f46",
@@ -142,8 +144,8 @@ export function StatusBar({
       )}
 
       {/* Actions */}
-      <ActionBtn onClick={onOpenLauncher} title="Cmd+K">Projects</ActionBtn>
-      <ActionBtn onClick={onOpenSettings} title="Cmd+,">Settings</ActionBtn>
+      <ActionBtn onClick={onOpenLauncher} title="Cmd+K" white><FolderOpen size={13} strokeWidth={1.5} /> Projects</ActionBtn>
+      <ActionBtn onClick={onOpenSettings} title="Cmd+," white><Settings size={13} strokeWidth={1.5} /> Settings</ActionBtn>
 
       {/* Active model indicator — only shows when a model is responding */}
       {activeModel && (
@@ -246,10 +248,11 @@ function Badge({ children, color = "#52525b", borderColor = "rgba(255,255,255,0.
 
 // ─── Action Button ───────────────────────────────────────────
 
-function ActionBtn({ children, onClick, title }: {
+function ActionBtn({ children, onClick, title, white }: {
   children: React.ReactNode;
   onClick: () => void;
   title: string;
+  white?: boolean;
 }): JSX.Element {
   return (
     <button
@@ -258,14 +261,14 @@ function ActionBtn({ children, onClick, title }: {
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: "0.25rem",
-        padding: "0.125rem 0.4rem",
+        gap: "0.3rem",
+        padding: "0.2rem 0.5rem",
         borderRadius: "0.25rem",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
+        border: white ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(255, 255, 255, 0.06)",
         background: "transparent",
-        color: "#52525b",
+        color: white ? "#d4d4d8" : "#52525b",
         fontFamily: '"Geist Mono", Menlo, monospace',
-        fontSize: "0.625rem",
+        fontSize: "0.6875rem",
         cursor: "pointer",
         lineHeight: 1.2,
         whiteSpace: "nowrap",

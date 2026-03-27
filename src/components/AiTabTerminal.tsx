@@ -20,7 +20,7 @@ export function AiTabTerminal({
         flexDirection: "column",
       }}
     >
-      <AiChatView paneId={tab.id} isActive={isActive} />
+      <AiChatView paneId={tab.id} isActive={isActive} cwd={tab.cwd} />
     </div>
   );
 }

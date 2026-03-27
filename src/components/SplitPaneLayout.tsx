@@ -299,7 +299,7 @@ interface SinglePaneProps {
 
 function SinglePane({ pane, isActive, setCwd }: SinglePaneProps): JSX.Element {
   if (pane.kind === "ai") {
-    return <AiChatView paneId={pane.id} isActive={isActive} />;
+    return <AiChatView paneId={pane.id} isActive={isActive} cwd={pane.cwd} />;
   }
 
   return (

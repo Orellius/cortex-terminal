@@ -12,15 +12,15 @@ export function useHomeDir(): HomeDirResult {
   const [cwd, setCwd] = useState("");
 
   useEffect(() => {
-    invoke<string>("get_home_dir")
-      .then((dir) => {
-        setHomeDir(dir);
-        setCwd((prev) => (prev ? prev : dir));
-      })
-      .catch(() => {
-        setHomeDir("/");
-        setCwd((prev) => (prev ? prev : "/"));
-      });
+    // Fetch both home dir and launch dir in parallel
+    Promise.all([
+      invoke<string>("get_home_dir").catch(() => "/"),
+      invoke<string>("get_launch_dir").catch(() => ""),
+    ]).then(([home, launch]) => {
+      setHomeDir(home);
+      // Use launch dir (where Cortex was opened from) as default, not home
+      setCwd((prev) => prev || launch || home);
+    });
   }, []);
 
   return { homeDir, cwd, setCwd };

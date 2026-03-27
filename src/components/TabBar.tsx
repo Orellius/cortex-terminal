@@ -38,17 +38,19 @@ export function TabBar({
         minHeight: TAB_BAR_HEIGHT,
         display: "flex",
         alignItems: "stretch",
-        background: "#09090b",
-        borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+        background: "#010101",
+        borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
+        paddingLeft: "0.75rem",
         overflowX: "auto",
         overflowY: "hidden",
         scrollbarWidth: "none",
       }}
     >
-      {tabs.map((tab) => {
+      {tabs.map((tab, index) => {
         const isActive = tab.id === activeTabId;
         const isHovered = hoveredId === tab.id;
-        const label = shortenPath(tab.title || tab.cwd, homeDir);
+        const sessionNum = index + 1;
+        const label = `${sessionNum}# ${shortenPath(tab.title || tab.cwd, homeDir)}`;
         const showClose = tabs.length > 1 && isHovered;
 
         return (
@@ -62,10 +64,14 @@ export function TabBar({
               alignItems: "center",
               gap: "0.375rem",
               padding: "0.25rem 0.75rem",
+              margin: "0.25rem 0.125rem",
               cursor: "pointer",
-              borderBottom: isActive
-                ? "2px solid #05a0ef"
-                : "2px solid transparent",
+              borderRadius: isActive ? "0.375rem" : "0.375rem",
+              background: isActive
+                ? "rgba(255, 255, 255, 0.06)"
+                : isHovered
+                ? "rgba(255, 255, 255, 0.03)"
+                : "transparent",
               color: isActive
                 ? "#e4e4e7"
                 : isHovered
@@ -75,7 +81,7 @@ export function TabBar({
               fontSize: "0.75rem",
               userSelect: "none",
               flexShrink: 0,
-              transition: "color 150ms ease",
+              transition: "color 150ms ease, background 150ms ease",
               position: "relative",
             }}
           >

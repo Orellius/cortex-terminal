@@ -98,7 +98,8 @@ export function AiChatInput({ onSubmit, disabled }: AiChatInputProps): JSX.Eleme
   const handleInput = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = "auto";
+    // Reset to 1-line height then expand to content — use minHeight to prevent jump
+    el.style.height = "1.5rem";
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
   }, []);
 

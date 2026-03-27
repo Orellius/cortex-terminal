@@ -22,9 +22,10 @@ interface AiStreamEvent {
 interface AiChatViewProps {
   paneId: string;
   isActive: boolean;
+  cwd: string;
 }
 
-export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
+export function AiChatView({ paneId, isActive, cwd }: AiChatViewProps): JSX.Element {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [thinking, setThinking] = useState<{ provider: string; startTime: number } | null>(null);
   const [sidebarFile, setSidebarFile] = useState<string | null>(null);
@@ -68,44 +69,86 @@ export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
     // Re-focus input when tab becomes active
   }, [isActive]);
 
-  // Listen for AI stream responses
+  // Listen for AI stream responses (supports incremental streaming)
   useEffect(() => {
     let unlisten: (() => void) | undefined;
 
     listen<AiStreamEvent>("cortex:ai:stream", (event) => {
       const d = event.payload;
       if (d.pane_id !== paneId) return;
-      if (!d.done) return;
+
+      // ── Streaming chunk (done: false) ──
+      if (!d.done) {
+        setThinking(null); // Stop thinking indicator on first chunk
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.streaming) {
+            // Append to existing streaming message
+            return [...prev.slice(0, -1), { ...last, content: last.content + d.chunk }];
+          }
+          // First chunk — create streaming message
+          return [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
+              role: "assistant" as const,
+              content: d.chunk,
+              provider: d.provider,
+              model: d.model,
+              timestamp: Date.now(),
+              streaming: true,
+            },
+          ];
+        });
+        return;
+      }
+
+      // ── Final event (done: true) — finalize with stats ──
+      setThinking(null);
 
       // Notify if response took >10s and window not focused
       if (d.duration_ms > 10000 && !document.hasFocus()) {
         const preview = d.chunk.slice(0, 80).replace(/\n/g, " ");
         isPermissionGranted().then((granted) => {
           if (!granted) { requestPermission().catch(() => {}); return; }
-          sendNotification({
-            title: "Cortex — Response Ready",
-            body: preview,
-          });
+          sendNotification({ title: "Cortex — Response Ready", body: preview });
         }).catch(() => {});
       }
 
-      setThinking(null);
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.streaming) {
+          // Finalize streaming message with verified content + stats
+          return [
+            ...prev.slice(0, -1),
+            {
+              ...last,
+              content: d.chunk || last.content,
+              cost: d.cost,
+              durationMs: d.duration_ms,
+              verified: d.verified,
+              streaming: undefined,
+            },
+          ];
+        }
+        // No streaming message — create fresh (non-streaming fallback)
+        return [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant" as const,
+            content: d.chunk,
+            provider: d.provider,
+            model: d.model,
+            cost: d.cost,
+            durationMs: d.duration_ms,
+            verified: d.verified,
+            timestamp: Date.now(),
+          },
+        ];
+      });
 
-      const msg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: d.chunk,
-        provider: d.provider,
-        model: d.model,
-        cost: d.cost,
-        durationMs: d.duration_ms,
-        verified: d.verified,
-        timestamp: Date.now(),
-      };
-
-      setMessages((prev) => [...prev, msg]);
-
-      // Persist assistant message
+      // Persist assistant message with final verified content
       if (conversationId.current) {
         invoke("add_message", {
           msg: {
@@ -128,9 +171,53 @@ export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
 
   const handleSubmit = useCallback(
     (text: string) => {
-      // Shell escape: ! prefix
+      // Shell escape: ! prefix — execute command and show output inline
       if (text.startsWith("!")) {
-        // TODO: wire shell execution for chat view
+        const cmd = text.slice(1).trim();
+        if (!cmd) return;
+
+        // Show the command as a user message
+        const cmdMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "user",
+          content: `!${cmd}`,
+          timestamp: Date.now(),
+        };
+        setMessages((prev) => [...prev, cmdMsg]);
+
+        // Execute and show result
+        invoke<{ stdout: string; stderr: string; exit_code: number }>("execute_shell", {
+          command: cmd,
+          cwd: cwd || undefined,
+        })
+          .then((result) => {
+            const output = (result.stdout + result.stderr).trim() || "(no output)";
+            const exitInfo = result.exit_code !== 0 ? `\n[exit ${result.exit_code}]` : "";
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: output + exitInfo,
+                provider: "system",
+                model: "shell",
+                timestamp: Date.now(),
+              },
+            ]);
+          })
+          .catch((err: unknown) => {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: `shell error: ${errMsg}`,
+                provider: "system",
+                timestamp: Date.now(),
+              },
+            ]);
+          });
         return;
       }
 
@@ -169,6 +256,7 @@ export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
         query: text,
         paneId,
         conversationId: conversationId.current,
+        cwd: cwd || undefined,
       }).catch((err: unknown) => {
         setThinking(null);
         const errMsg = err instanceof Error ? err.message : String(err);
@@ -195,7 +283,7 @@ export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
         flex: 1,
         minHeight: 0,
         position: "relative",
-        background: "#09090b",
+        background: "#010101",
       }}
     >
       {/* Watermark — centered vertically, slightly above center so skull sits above input */}
@@ -236,30 +324,8 @@ export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
         }}
       >
         {messages.length === 0 && !thinking && (
-          <div
-            style={{
-              fontFamily: '"Geist Mono", Menlo, monospace',
-              lineHeight: 1.8,
-              marginTop: "2rem",
-            }}
-          >
-            <div style={{ color: "#e4e4e7", fontWeight: 600, fontSize: "0.875rem", marginBottom: "0.5rem" }}>
-              Cortex Terminal Initialized
-            </div>
-            <div style={{ color: "#10b981", fontSize: "0.6875rem", marginBottom: "0.75rem" }}>
-              LLMs connected. Ready.
-            </div>
-            <div style={{ color: "#3f3f46", fontSize: "0.6875rem" }}>
-              Type naturally. Models route automatically.
-            </div>
-            <div style={{ color: "#3f3f46", fontSize: "0.6875rem" }}>
-              Prefix <span style={{ color: "#52525b" }}>!</span> for shell commands.
-            </div>
-            <div style={{ color: "#27272a", fontSize: "0.6875rem", marginTop: "0.5rem" }}>
-              <span style={{ color: "#8b5cf6" }}>c:</span> Claude{" "}
-              <span style={{ color: "#8b5cf6" }}>s:</span> Sonnet{" "}
-              <span style={{ color: "#10b981" }}>l:</span> Local
-            </div>
+          <div style={{ fontFamily: '"Geist Mono", Menlo, monospace', fontSize: "0.8125rem", color: "#27272a" }}>
+            cortex ready · models connected
           </div>
         )}
 

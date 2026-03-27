@@ -101,7 +101,7 @@ export function AiThinkingIndicator({ provider, startTime }: Props): JSX.Element
       <span style={{ color, fontSize: "0.875rem" }}>{spinner}</span>
       <span style={{ color, fontSize: "0.6875rem" }}>{icon}</span>
       <span style={{ color: "#52525b" }}>{statusText}</span>
-      <span style={{ color: "#3f3f46", marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>
+      <span style={{ color: "#27272a", fontVariantNumeric: "tabular-nums" }}>
         {elapsed}s
       </span>
     </div>

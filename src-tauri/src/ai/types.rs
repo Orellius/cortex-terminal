@@ -44,7 +44,11 @@ pub(crate) struct CortexConfig {
     pub ollama_model: String,
     pub ollama_endpoint: String,
     pub daily_budget_usd: f64,
+    #[serde(default = "default_permission_mode")]
+    pub permission_mode: String,
 }
+
+fn default_permission_mode() -> String { "ask".to_string() }
 
 impl Default for CortexConfig {
     fn default() -> Self {
@@ -55,6 +59,7 @@ impl Default for CortexConfig {
             ollama_model: "nemotron-cascade-2".to_string(),
             ollama_endpoint: "http://localhost:11434".to_string(),
             daily_budget_usd: 5.0,
+            permission_mode: "ask".to_string(),
         }
     }
 }
