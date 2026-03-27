@@ -150,6 +150,18 @@ function AssistantMessage({ message, onOpenFile, onOpenContent }: {
             return;
           }
 
+          // Run/Copy button on code blocks
+          const runCmd = target.getAttribute("data-run-cmd");
+          if (runCmd) {
+            e.preventDefault();
+            const cmd = decodeURIComponent(runCmd);
+            navigator.clipboard.writeText(cmd).catch(() => {});
+            // Visual feedback
+            target.textContent = "Copied!";
+            setTimeout(() => { target.textContent = "Run"; }, 1500);
+            return;
+          }
+
           // URL links → open in system browser via Tauri
           if (target.tagName === "A") {
             e.preventDefault();
@@ -205,11 +217,16 @@ function renderMarkdown(text: string): string {
         const clickAttr = isMarkdown
           ? ` data-md-content="${encodeURIComponent(rawContent)}" style="cursor:pointer;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:0.375rem;padding:0.5rem 0.625rem;margin:0.375rem 0;font-family:'Geist Mono',Menlo,monospace;font-size:0.75rem;color:#a1a1aa;overflow-x:auto"`
           : ` style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:0.375rem;padding:0.5rem 0.625rem;margin:0.375rem 0;font-family:'Geist Mono',Menlo,monospace;font-size:0.75rem;color:#a1a1aa;overflow-x:auto"`;
+        // Shell code blocks get a "Run" button
+        const isShell = ["bash", "sh", "zsh", "shell", ""].includes(codeLang.toLowerCase());
+        const runButton = isShell && rawContent.trim().length > 0
+          ? `<div style="display:flex;gap:0.5rem;margin-top:0.375rem"><button data-run-cmd="${encodeURIComponent(rawContent.trim())}" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:0.25rem;padding:0.1875rem 0.5rem;color:#a1a1aa;font-family:'Geist Mono',Menlo,monospace;font-size:0.625rem;cursor:pointer">Run</button><button onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(rawContent.trim())}'))" style="background:none;border:1px solid rgba(255,255,255,0.06);border-radius:0.25rem;padding:0.1875rem 0.5rem;color:#52525b;font-family:'Geist Mono',Menlo,monospace;font-size:0.625rem;cursor:pointer">Copy</button></div>`
+          : "";
         const viewHint = isMarkdown
           ? `<div style="font-size:0.5625rem;color:#05a0ef;margin-top:0.25rem;cursor:pointer" data-md-content="${encodeURIComponent(rawContent)}">Click to preview</div>`
           : "";
         result.push(
-          `<div${clickAttr}>${langLabel}<pre style="margin:0;white-space:pre-wrap">${escaped}</pre>${viewHint}</div>`
+          `<div${clickAttr}>${langLabel}<pre style="margin:0;white-space:pre-wrap">${escaped}</pre>${runButton}${viewHint}</div>`
         );
         codeLang = "";
       }
