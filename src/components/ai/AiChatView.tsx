@@ -368,14 +368,19 @@ export function AiChatView({ paneId, isActive, cwd, showSearch, onCloseSearch, o
         }}
       >
         {messages.length === 0 && !thinking && (
-          <pre style={{ fontFamily: '"Geist Mono", Menlo, monospace', fontSize: "0.625rem", color: "rgba(255,255,255,0.12)", lineHeight: 1.3, margin: 0, userSelect: "none", whiteSpace: "pre" }}>{
+          <>
+            <pre style={{ fontFamily: '"Geist Mono", Menlo, monospace', fontSize: "0.625rem", color: "rgba(255,255,255,0.3)", lineHeight: 1.3, margin: 0, userSelect: "none", whiteSpace: "pre" }}>{
 ` ██████╗ ██████╗ ██████╗ ████████╗███████╗██╗  ██╗
 ██╔════╝██╔═══██╗██╔══██╗╚══██╔══╝██╔════╝╚██╗██╔╝
 ██║     ██║   ██║██████╔╝   ██║   █████╗   ╚███╔╝
 ██║     ██║   ██║██╔══██╗   ██║   ██╔══╝   ██╔██╗
 ╚██████╗╚██████╔╝██║  ██║   ██║   ███████╗██╔╝ ██╗
  ╚═════╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝`
-          }</pre>
+            }</pre>
+            <div style={{ fontFamily: '"Geist Mono", Menlo, monospace', fontSize: "0.5625rem", color: "rgba(255,255,255,0.3)", marginTop: "0.375rem", userSelect: "none" }}>
+              AI first terminal intertwined with shell second by Orellius.ai
+            </div>
+          </>
         )}
 
         {messages.map((msg) => {
