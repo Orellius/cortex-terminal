@@ -89,7 +89,7 @@ export function SettingsOverlay({ onClose }: SettingsOverlayProps): JSX.Element 
       style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ width: "min(56rem, 92vw)", height: "min(40rem, 85vh)", background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "0.5rem", display: "flex", overflow: "hidden", fontFamily: '"Geist Sans", -apple-system, sans-serif' }}>
+      <div style={{ width: "min(56rem, 92vw)", height: "min(40rem, 85vh)", background: "#010101", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "0.5rem", display: "flex", overflow: "hidden", fontFamily: '"Geist Mono", Menlo, monospace' }}>
         {/* ── Sidebar ── */}
         <div style={{ width: "12rem", flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", padding: "0.75rem 0" }}>
           {/* Header */}

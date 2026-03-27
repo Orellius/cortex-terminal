@@ -277,6 +277,48 @@ pub(crate) struct ProjectEntry {
     pub path: String,
 }
 
+/// Save a directory to recent projects list (~/.cortex/recents.json)
+#[tauri::command]
+pub(crate) async fn save_recent_project(path: String) -> Result<(), String> {
+    let recents_path = recents_file();
+    let mut recents = load_recents();
+    // Remove if already exists, add to front
+    recents.retain(|p| p != &path);
+    recents.insert(0, path);
+    recents.truncate(20); // Keep last 20
+    let json = serde_json::to_string_pretty(&recents).map_err(|e| format!("json error: {e}"))?;
+    fs::write(recents_path, json).map_err(|e| format!("write error: {e}"))?;
+    Ok(())
+}
+
+/// Load recent projects
+#[tauri::command]
+pub(crate) async fn get_recent_projects() -> Result<Vec<ProjectEntry>, String> {
+    let recents = load_recents();
+    Ok(recents.iter().filter_map(|p| {
+        let path = Path::new(p);
+        if path.is_dir() {
+            let name = path.file_name()?.to_string_lossy().to_string();
+            Some(ProjectEntry { name, path: p.clone() })
+        } else {
+            None
+        }
+    }).collect())
+}
+
+fn recents_file() -> std::path::PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    Path::new(&home).join(".cortex").join("recents.json")
+}
+
+fn load_recents() -> Vec<String> {
+    let path = recents_file();
+    fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
 /// Lists all git repos under ~/Projects (or CORTEX_PROJECTS_DIR env var),
 /// scanning up to 2 levels deep. Each entry shows `category/name` for
 /// nested repos. Sorted alphabetically.

@@ -21,6 +21,7 @@
     "core:window:allow-is-visible",
     "core:window:allow-close",
     "global-shortcut:default",
-    "notification:default"
+    "notification:default",
+    "dialog:default"
   ]
 }

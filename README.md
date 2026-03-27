@@ -35,6 +35,25 @@
 
 ---
 
+## How Cortex compares
+
+| Feature | iTerm2 | Warp | Cursor | Claude Code | Cortex |
+|---|---|---|---|---|---|
+| Terminal (real PTY) | Yes | Yes | No (IDE) | Yes | Yes |
+| AI built-in | No | 1 model | 1-2 models | 1 (Claude) | Multiple, routed |
+| Multi-model routing | No | No | No | No | Yes (complexity scored) |
+| Local models (Ollama) | No | No | No | No | Yes (free, private) |
+| MCP tool bridge | No | No | No | Yes | Yes (shared across all models) |
+| Cost tracking | No | No | No | No | Yes (budget cap + local fallback) |
+| Streaming responses | N/A | Yes | Yes | Yes | Yes |
+| Context-aware (git, cwd) | No | Partial | Yes | Yes | Yes |
+| Split panes | Yes | No | Yes | No | Yes |
+| Open source | No | No | No | Yes | Yes (Apache 2.0) |
+| Native desktop | Yes | Yes | Yes | CLI | Yes (Tauri) |
+| Price | Free | Free/$15 | $20/mo | Subscription | Free |
+
+---
+
 ## What it is
 
 Cortex is a native desktop terminal that puts Claude and local Ollama models alongside a real shell in one window. You type in a single input. The router decides which model to call based on what you wrote. Responses stream token-by-token. All models share the same MCP tool bridge.

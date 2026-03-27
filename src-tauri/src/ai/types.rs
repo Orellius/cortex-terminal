@@ -46,9 +46,15 @@ pub(crate) struct CortexConfig {
     pub daily_budget_usd: f64,
     #[serde(default = "default_permission_mode")]
     pub permission_mode: String,
+    #[serde(default = "default_font_size")]
+    pub font_size: u8,
+    #[serde(default = "default_accent_color")]
+    pub accent_color: String,
 }
 
 fn default_permission_mode() -> String { "ask".to_string() }
+fn default_font_size() -> u8 { 13 }
+fn default_accent_color() -> String { "#05a0ef".to_string() }
 
 impl Default for CortexConfig {
     fn default() -> Self {
@@ -60,6 +66,8 @@ impl Default for CortexConfig {
             ollama_endpoint: "http://localhost:11434".to_string(),
             daily_budget_usd: 5.0,
             permission_mode: "ask".to_string(),
+            font_size: 13,
+            accent_color: "#05a0ef".to_string(),
         }
     }
 }

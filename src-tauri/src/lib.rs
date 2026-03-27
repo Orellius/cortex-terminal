@@ -23,7 +23,8 @@ use commands::chat_commands::{
 use commands::pty_commands::{kill_pty, resize_pty, spawn_pty, write_pty, PtyState};
 use commands::status_commands::{
     execute_shell, get_claude_usage, get_git_branch, get_home_dir, get_launch_dir,
-    list_projects, open_external, read_file_content,
+    get_recent_projects, list_projects, open_external, read_file_content,
+    save_recent_project,
 };
 use pty::PtyManager;
 
@@ -92,6 +93,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(pty_state)
         .manage(config_state)
         .manage(mcp_state)
@@ -100,7 +102,7 @@ pub fn run() {
             spawn_pty, write_pty, resize_pty, kill_pty,
             // Status
             get_git_branch, get_claude_usage, get_home_dir, get_launch_dir, execute_shell,
-            list_projects, read_file_content,
+            list_projects, get_recent_projects, save_recent_project, read_file_content,
             open_external,
             // AI
             check_providers, send_ai_query, get_ai_config, update_ai_config, get_budget_status,

@@ -1,179 +1,153 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { JSX, KeyboardEvent } from "react";
-import type { LauncherProps, ProjectEntry } from "../types";
+import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+import { FolderOpen } from "lucide-react";
+import type { ProjectEntry } from "../types";
 
-export function ProjectLauncher({
-  projects,
-  onSelect,
-  onClose,
-}: LauncherProps): JSX.Element {
+interface LauncherProps {
+  projects: ProjectEntry[];
+  onSelect: (project: ProjectEntry) => void;
+  onClose: () => void;
+}
+
+type Tab = "projects" | "recents";
+const MONO: React.CSSProperties = { fontFamily: '"Geist Mono", Menlo, monospace' };
+
+export function ProjectLauncher({ projects, onSelect, onClose }: LauncherProps): JSX.Element {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState<Tab>("projects");
+  const [recents, setRecents] = useState<ProjectEntry[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const filtered = projects.filter((p) =>
-    p.name.toLowerCase().includes(query.toLowerCase())
-  );
-
-  const clampedIndex =
-    filtered.length === 0 ? 0 : Math.min(selectedIndex, filtered.length - 1);
-
-  useEffect(() => { setSelectedIndex(0); }, [query]);
   useEffect(() => { inputRef.current?.focus(); }, []);
   useEffect(() => {
-    if (!listRef.current) return;
-    const item = listRef.current.children[clampedIndex] as HTMLElement | undefined;
+    invoke<ProjectEntry[]>("get_recent_projects").then(setRecents).catch(() => {});
+  }, []);
+
+  const items = activeTab === "recents" ? recents : projects;
+  const filtered = items.filter((p) =>
+    p.name.toLowerCase().includes(query.toLowerCase()) ||
+    p.path.toLowerCase().includes(query.toLowerCase())
+  );
+  const clampedIndex = filtered.length === 0 ? 0 : Math.min(selectedIndex, filtered.length - 1);
+
+  useEffect(() => { setSelectedIndex(0); }, [query, activeTab]);
+  useEffect(() => {
+    const item = listRef.current?.children[clampedIndex] as HTMLElement | undefined;
     item?.scrollIntoView({ block: "nearest" });
   }, [clampedIndex]);
 
+  const selectProject = useCallback((project: ProjectEntry) => {
+    invoke("save_recent_project", { path: project.path }).catch(() => {});
+    onSelect(project);
+  }, [onSelect]);
+
+  const browseDirectory = useCallback(async () => {
+    try {
+      const selected = await open({ directory: true, multiple: false, title: "Choose project directory" });
+      if (selected && typeof selected === "string") {
+        const name = selected.split("/").pop() ?? selected;
+        selectProject({ name, path: selected });
+      }
+    } catch {
+      // User cancelled
+    }
+  }, [selectProject]);
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") { e.preventDefault(); onClose(); return; }
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setSelectedIndex((p) => filtered.length === 0 ? 0 : Math.min(p + 1, filtered.length - 1));
-      return;
-    }
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setSelectedIndex((p) => Math.max(p - 1, 0));
-      return;
-    }
+    if (e.key === "ArrowDown") { e.preventDefault(); setSelectedIndex((p) => Math.min(p + 1, filtered.length - 1)); return; }
+    if (e.key === "ArrowUp") { e.preventDefault(); setSelectedIndex((p) => Math.max(p - 1, 0)); return; }
+    if (e.key === "Tab") { e.preventDefault(); setActiveTab((t) => t === "projects" ? "recents" : "projects"); return; }
     if (e.key === "Enter") {
       e.preventDefault();
       const project = filtered[clampedIndex];
-      if (project) onSelect(project);
+      if (project) selectProject(project);
     }
-  };
-
-  // Split "category/name" for display
-  const renderName = (name: string, isActive: boolean) => {
-    const parts = name.split("/");
-    if (parts.length === 2) {
-      return (
-        <>
-          <span style={{ color: isActive ? "#71717a" : "#3f3f46" }}>
-            {parts[0]}/
-          </span>
-          <span>{parts[1]}</span>
-        </>
-      );
-    }
-    return <span>{name}</span>;
   };
 
   return (
     <div
       onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0, 0, 0, 0.5)",
-        backdropFilter: "blur(4px)",
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "center",
-        paddingTop: "20vh",
-        zIndex: 100,
-      }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "15vh", zIndex: 100 }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#111114",
-          border: "1px solid rgba(255, 255, 255, 0.06)",
-          borderRadius: "0.625rem",
-          width: "min(30rem, 90vw)",
-          maxHeight: "min(22rem, 60vh)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          boxShadow: "0 1.5rem 4rem rgba(0, 0, 0, 0.5)",
-        }}
+        style={{ background: "#010101", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "0.375rem", width: "min(34rem, 90vw)", maxHeight: "min(26rem, 65vh)", display: "flex", flexDirection: "column", overflow: "hidden" }}
       >
-        {/* Search input */}
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          padding: "0.75rem 1rem",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
-        }}>
-          <span style={{
-            color: "#3f3f46",
-            fontFamily: '"Geist Mono", monospace',
-            fontSize: "0.875rem",
-          }}>
-            &gt;
-          </span>
+        {/* Input */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.625rem 0.75rem", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+          <span style={{ ...MONO, color: "#3f3f46", fontSize: "0.8125rem" }}>&gt;</span>
           <input
             ref={inputRef}
-            type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Jump to project..."
-            style={{
-              background: "transparent",
-              border: "none",
-              outline: "none",
-              flex: 1,
-              fontFamily: '"Geist Mono", Menlo, monospace',
-              fontSize: "0.875rem",
-              color: "#e4e4e7",
-              letterSpacing: "0.02em",
-            }}
+            style={{ ...MONO, flex: 1, background: "transparent", border: "none", outline: "none", fontSize: "0.8125rem", color: "#e4e4e7" }}
           />
-          <span style={{
-            fontFamily: '"Geist Mono", monospace',
-            fontSize: "0.625rem",
-            color: "#3f3f46",
-            padding: "0.125rem 0.375rem",
-            border: "1px solid rgba(255, 255, 255, 0.06)",
-            borderRadius: "0.2rem",
-          }}>
-            esc
-          </span>
+          <button
+            onClick={browseDirectory}
+            title="Browse directory"
+            style={{ ...MONO, display: "flex", alignItems: "center", gap: "0.25rem", background: "none", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "0.25rem", padding: "0.25rem 0.5rem", color: "#71717a", fontSize: "0.625rem", cursor: "pointer" }}
+          >
+            <FolderOpen size={11} strokeWidth={1.5} /> Browse
+          </button>
         </div>
 
-        {/* Results */}
-        <div ref={listRef} style={{ overflowY: "auto", flex: 1, padding: "0.25rem 0" }}>
+        {/* Tabs */}
+        <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.04)", padding: "0 0.5rem" }}>
+          {(["projects", "recents"] as Tab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                ...MONO, fontSize: "0.625rem", padding: "0.375rem 0.625rem",
+                background: activeTab === tab ? "rgba(255,255,255,0.04)" : "transparent",
+                border: "none", borderRadius: "0.25rem 0.25rem 0 0",
+                color: activeTab === tab ? "#a1a1aa" : "#3f3f46",
+                cursor: "pointer",
+              }}
+            >
+              {tab === "projects" ? "Projects" : "Recents"}
+              {tab === "recents" && recents.length > 0 && (
+                <span style={{ color: "#27272a", marginLeft: "0.25rem" }}>{recents.length}</span>
+              )}
+            </button>
+          ))}
+          <span style={{ ...MONO, fontSize: "0.5rem", color: "#27272a", marginLeft: "auto", alignSelf: "center" }}>Tab to switch</span>
+        </div>
+
+        {/* List */}
+        <div ref={listRef} style={{ overflowY: "auto", flex: 1, padding: "0.125rem 0" }}>
           {filtered.length === 0 ? (
-            <div style={{
-              padding: "1rem",
-              fontFamily: '"Geist Mono", monospace',
-              fontSize: "0.8rem",
-              color: "#3f3f46",
-              textAlign: "center",
-            }}>
-              No projects match "{query}"
+            <div style={{ ...MONO, fontSize: "0.75rem", color: "#27272a", textAlign: "center", padding: "1.5rem" }}>
+              {activeTab === "recents" ? "No recent projects" : `No projects match "${query}"`}
             </div>
           ) : (
-            filtered.map((project: ProjectEntry, idx: number) => {
+            filtered.map((project, idx) => {
               const isActive = idx === clampedIndex;
               return (
                 <div
                   key={project.path}
-                  onClick={() => onSelect(project)}
+                  onClick={() => selectProject(project)}
                   onMouseEnter={() => setSelectedIndex(idx)}
                   style={{
-                    padding: "0.5rem 1rem",
-                    fontFamily: '"Geist Mono", Menlo, monospace',
-                    fontSize: "0.8rem",
-                    color: isActive ? "#e4e4e7" : "#a1a1aa",
-                    background: isActive
-                      ? "rgba(5, 160, 239, 0.08)"
-                      : "transparent",
-                    borderLeft: isActive
-                      ? "2px solid #05a0ef"
-                      : "2px solid transparent",
-                    cursor: "pointer",
-                    userSelect: "none",
-                    transition: "all 60ms ease",
-                    letterSpacing: "0.01em",
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "0.375rem 0.75rem", cursor: "pointer",
+                    background: isActive ? "rgba(255,255,255,0.04)" : "transparent",
+                    borderLeft: isActive ? "2px solid rgba(255,255,255,0.2)" : "2px solid transparent",
                   }}
                 >
-                  {renderName(project.name, isActive)}
+                  <span style={{ ...MONO, fontSize: "0.75rem", color: isActive ? "#e4e4e7" : "#71717a" }}>
+                    {project.name}
+                  </span>
+                  <span style={{ ...MONO, fontSize: "0.5625rem", color: "#27272a", maxWidth: "14rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {project.path.replace(/^\/Users\/[^/]+/, "~")}
+                  </span>
                 </div>
               );
             })
