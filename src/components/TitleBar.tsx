@@ -15,8 +15,11 @@ export function TitleBar({ shortPath }: TitleBarProps): JSX.Element {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
+        borderBottom: "none",
         userSelect: "none",
+        // Leave space for macOS stoplight buttons (traffic lights)
+        paddingLeft: "5rem",
+        paddingRight: "0.75rem",
       }}
     >
       <span

@@ -148,8 +148,8 @@ export function SettingsOverlay({ onClose }: SettingsOverlayProps): JSX.Element 
         <div
           style={{
             display: "flex",
-            gap: "0",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+            gap: "0.25rem",
+            padding: "0.25rem 0.5rem",
           }}
         >
           {TABS.map((tab) => (
@@ -158,18 +158,18 @@ export function SettingsOverlay({ onClose }: SettingsOverlayProps): JSX.Element 
               onClick={() => setActiveTab(tab.id)}
               style={{
                 flex: 1,
-                padding: "0.5rem 0.75rem",
-                background: "none",
+                padding: "0.375rem 0.625rem",
+                background: activeTab === tab.id
+                  ? "rgba(255, 255, 255, 0.06)"
+                  : "transparent",
                 border: "none",
-                borderBottom: activeTab === tab.id
-                  ? "2px solid #e4e4e7"
-                  : "2px solid transparent",
+                borderRadius: "0.375rem",
                 color: activeTab === tab.id ? "#e4e4e7" : "#52525b",
                 fontFamily: '"Geist Mono", Menlo, monospace',
                 fontSize: "0.6875rem",
                 fontWeight: activeTab === tab.id ? 600 : 400,
                 cursor: "pointer",
-                transition: "color 100ms, border-color 100ms",
+                transition: "color 100ms, background 100ms",
               }}
             >
               {tab.label}

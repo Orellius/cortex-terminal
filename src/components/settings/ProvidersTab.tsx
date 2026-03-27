@@ -1,4 +1,4 @@
-import { useState, useCallback, type JSX } from "react";
+import { useState, useCallback, useEffect, type JSX } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 interface CortexConfig {
@@ -17,11 +17,20 @@ interface ProviderStatus {
   model: string;
 }
 
+interface OllamaModel {
+  name: string;
+  size: string;
+  modified_at: string;
+}
+
 interface ProvidersTabProps {
   config: CortexConfig;
   onSave: (config: CortexConfig) => Promise<void>;
   saving: boolean;
 }
+
+const CLAUDE_MODELS = ["sonnet", "opus", "haiku"];
+const GEMINI_MODELS = ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"];
 
 const FIELD_STYLE: React.CSSProperties = {
   display: "flex",
@@ -61,6 +70,12 @@ const BTN_STYLE: React.CSSProperties = {
   transition: "opacity 100ms",
 };
 
+const SELECT_STYLE: React.CSSProperties = {
+  ...INPUT_STYLE,
+  appearance: "none" as const,
+  cursor: "pointer",
+};
+
 const BTN_SECONDARY: React.CSSProperties = {
   ...BTN_STYLE,
   background: "transparent",
@@ -75,7 +90,14 @@ export function ProvidersTab({ config, onSave, saving }: ProvidersTabProps): JSX
   const [geminiKey, setGeminiKey] = useState(config.gemini_api_key ?? "");
   const [ollamaModel, setOllamaModel] = useState(config.ollama_model);
   const [ollamaEndpoint, setOllamaEndpoint] = useState(config.ollama_endpoint);
+  const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [testResults, setTestResults] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    invoke<OllamaModel[]>("list_ollama_models")
+      .then(setOllamaModels)
+      .catch(() => {});
+  }, []);
 
   const handleSave = useCallback(() => {
     onSave({
@@ -120,12 +142,15 @@ export function ProvidersTab({ config, onSave, saving }: ProvidersTabProps): JSX
       >
         <div style={FIELD_STYLE}>
           <label style={LABEL_STYLE}>Model</label>
-          <input
-            style={INPUT_STYLE}
+          <select
+            style={SELECT_STYLE}
             value={claudeModel}
             onChange={(e) => setClaudeModel(e.target.value)}
-            placeholder="sonnet"
-          />
+          >
+            {CLAUDE_MODELS.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <button style={BTN_SECONDARY} onClick={() => testConnection("claude")}>
@@ -148,12 +173,15 @@ export function ProvidersTab({ config, onSave, saving }: ProvidersTabProps): JSX
       >
         <div style={FIELD_STYLE}>
           <label style={LABEL_STYLE}>Model</label>
-          <input
-            style={INPUT_STYLE}
+          <select
+            style={SELECT_STYLE}
             value={geminiModel}
             onChange={(e) => setGeminiModel(e.target.value)}
-            placeholder="gemini-2.0-flash"
-          />
+          >
+            {GEMINI_MODELS.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
         </div>
         <div style={FIELD_STYLE}>
           <label style={LABEL_STYLE}>API Key</label>
@@ -186,12 +214,19 @@ export function ProvidersTab({ config, onSave, saving }: ProvidersTabProps): JSX
       >
         <div style={FIELD_STYLE}>
           <label style={LABEL_STYLE}>Model</label>
-          <input
-            style={INPUT_STYLE}
+          <select
+            style={SELECT_STYLE}
             value={ollamaModel}
             onChange={(e) => setOllamaModel(e.target.value)}
-            placeholder="nemotron-cascade-2"
-          />
+          >
+            {ollamaModels.length > 0 ? (
+              ollamaModels.map((m) => (
+                <option key={m.name} value={m.name}>{m.name} ({m.size})</option>
+              ))
+            ) : (
+              <option value={ollamaModel}>{ollamaModel}</option>
+            )}
+          </select>
         </div>
         <div style={FIELD_STYLE}>
           <label style={LABEL_STYLE}>Endpoint</label>

@@ -1,7 +1,6 @@
 import { useState, useEffect, type JSX } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { ClaudeUsage } from "../types";
-import { STATUS_BAR_HEIGHT } from "../constants";
 
 interface ProviderStatus {
   name: string;
@@ -41,6 +40,28 @@ const PROVIDER_ICONS: Record<string, string> = {
   ollama: "●",
 };
 
+const BTN: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "0.25rem",
+  padding: "0.1875rem 0.5rem",
+  borderRadius: "0.25rem",
+  border: "1px solid rgba(255, 255, 255, 0.06)",
+  background: "transparent",
+  color: "#52525b",
+  fontFamily: '"Geist Mono", Menlo, monospace',
+  fontSize: "0.6875rem",
+  cursor: "pointer",
+  lineHeight: 1,
+  transition: "color 100ms, border-color 100ms, background 100ms",
+  whiteSpace: "nowrap",
+};
+
+const KBD: React.CSSProperties = {
+  fontSize: "0.625rem",
+  color: "#3f3f46",
+};
+
 export function StatusBar({
   branch,
   usage,
@@ -49,10 +70,8 @@ export function StatusBar({
 }: StatusBarProps): JSX.Element {
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [budget, setBudget] = useState<BudgetStatus>({ spent_today: 0, limit: 5, is_capped: false });
-  const [showInfo, setShowInfo] = useState(false);
 
   useEffect(() => {
-    // Check providers on mount + every 30s
     const check = () => {
       invoke<ProviderStatus[]>("check_providers").then(setProviders).catch(() => {});
       invoke<BudgetStatus>("get_budget_status").then(setBudget).catch(() => {});
@@ -67,17 +86,16 @@ export function StatusBar({
   return (
     <div
       style={{
-        height: STATUS_BAR_HEIGHT,
-        minHeight: STATUS_BAR_HEIGHT,
+        height: "2.25rem",
+        minHeight: "2.25rem",
         display: "flex",
         alignItems: "center",
-        gap: "0.75rem",
+        gap: "0.5rem",
         padding: "0 0.75rem",
-        borderTop: "1px solid rgba(255, 255, 255, 0.06)",
-        background: "#010101",
-        position: "relative" as const,
+        borderTop: "none",
+        background: "transparent",
         fontFamily: '"Geist Mono", Menlo, monospace',
-        fontSize: "0.6875rem",
+        fontSize: "0.75rem",
         color: "#3f3f46",
         userSelect: "none",
         fontVariantNumeric: "tabular-nums",
@@ -88,24 +106,14 @@ export function StatusBar({
         {branch !== "—" ? branch : ""}
       </span>
 
-      {/* Cmd+K hint */}
-      <span
-        onClick={onOpenLauncher}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "0.25rem",
-          padding: "0.125rem 0.375rem",
-          borderRadius: "0.25rem",
-          border: "1px solid rgba(255, 255, 255, 0.06)",
-          color: "#52525b",
-          fontSize: "0.6875rem",
-          cursor: "pointer",
-          lineHeight: 1,
-        }}
-      >
-        <span style={{ fontSize: "0.625rem" }}>&#8984;</span>K
-      </span>
+      {/* Action buttons */}
+      <button onClick={onOpenLauncher} style={BTN} title="Project Launcher (Cmd+K)">
+        Projects <span style={KBD}>&#8984;K</span>
+      </button>
+
+      <button onClick={onOpenSettings} style={BTN} title="Settings (Cmd+,)">
+        Settings <span style={KBD}>&#8984;,</span>
+      </button>
 
       {/* Model status indicators */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -124,7 +132,7 @@ export function StatusBar({
             title={`${p.name}: ${p.available ? p.model : "offline"}`}
           >
             {PROVIDER_ICONS[p.kind] ?? "○"}
-            <span style={{ fontSize: "0.625rem" }}>{p.name}</span>
+            <span style={{ fontSize: "0.6875rem" }}>{p.name}</span>
           </span>
         ))}
       </div>
@@ -151,85 +159,6 @@ export function StatusBar({
           {Math.round(usage.weekly_pct)}%
         </span>
       </span>
-      {/* Settings button with Cmd+, hint */}
-      <span
-        onClick={onOpenSettings}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "0.25rem",
-          padding: "0.125rem 0.375rem",
-          borderRadius: "0.25rem",
-          border: "1px solid rgba(255, 255, 255, 0.06)",
-          color: "#52525b",
-          fontSize: "0.6875rem",
-          cursor: "pointer",
-          lineHeight: 1,
-          transition: "color 100ms, border-color 100ms",
-        }}
-        title="Settings (Cmd+,)"
-      >
-        <span style={{ fontSize: "0.625rem" }}>&#8984;</span>,
-      </span>
-
-      {/* Routing info button */}
-      <span
-        onClick={() => setShowInfo(!showInfo)}
-        style={{
-          cursor: "pointer",
-          color: showInfo ? "#71717a" : "#27272a",
-          fontSize: "0.75rem",
-          transition: "color 100ms",
-        }}
-        title="Model routing info"
-      >
-        ⓘ
-      </span>
-
-      {/* Routing info tooltip */}
-      {showInfo && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: STATUS_BAR_HEIGHT,
-            right: "0.5rem",
-            width: "22rem",
-            padding: "0.75rem",
-            borderRadius: "0.5rem",
-            border: "1px solid rgba(255, 255, 255, 0.1)",
-            background: "#0d0d0d",
-            fontFamily: '"Geist Mono", Menlo, monospace',
-            fontSize: "0.625rem",
-            color: "#a1a1aa",
-            lineHeight: 1.6,
-            zIndex: 50,
-          }}
-        >
-          <div style={{ fontWeight: 600, color: "#e4e4e7", marginBottom: "0.5rem", fontSize: "0.6875rem" }}>
-            Model Routing
-          </div>
-          <div style={{ color: "#71717a", marginBottom: "0.5rem" }}>
-            Queries are scored 0-10 based on word signals:
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-            <div>
-              <span style={{ color: "#8b5cf6" }}>◆ Claude (5+)</span>
-              <span style={{ color: "#52525b" }}> — fix, build, debug, refactor, deploy, bug, error, .rs/.ts, code syntax</span>
-            </div>
-            <div>
-              <span style={{ color: "#0ea5e9" }}>◈ Gemini (3-4)</span>
-              <span style={{ color: "#52525b" }}> — explain, compare, analyze, research, summarize, "what is", "how to"</span>
-            </div>
-            <div>
-              <span style={{ color: "#10b981" }}>● Nemotron (0-2)</span>
-              <span style={{ color: "#52525b" }}> — short queries, simple questions, default fallback</span>
-            </div>
-          </div>
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "0.5rem", paddingTop: "0.5rem", color: "#52525b" }}>
-            Force a model: <span style={{ color: "#71717a" }}>c:</span> Claude · <span style={{ color: "#71717a" }}>g:</span> Gemini · <span style={{ color: "#71717a" }}>l:</span> Local
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -106,11 +106,23 @@ fn execute_ollama(prompt: &str, model: &str, endpoint: &str) -> Result<String> {
         .send()
         .context("ollama request failed")?;
 
-    let parsed: serde_json::Value = resp.json().context("ollama parse failed")?;
+    let status = resp.status();
+    let raw = resp.text().context("ollama read body failed")?;
+
+    if !status.is_success() {
+        // Ollama returns error details in the body
+        let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap_or_default();
+        let detail = parsed["error"].as_str().unwrap_or(&raw);
+        anyhow::bail!("ollama ({status}): {detail}");
+    }
+
+    let parsed: serde_json::Value = serde_json::from_str(&raw)
+        .context("ollama json parse failed")?;
+
     if let Some(text) = parsed["response"].as_str() {
         Ok(text.to_string())
     } else {
-        anyhow::bail!("ollama: unexpected response")
+        anyhow::bail!("ollama: no 'response' field in: {}", &raw[..raw.len().min(200)])
     }
 }
 
