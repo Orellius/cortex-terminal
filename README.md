@@ -434,6 +434,8 @@ If Cortex is useful to you, give it a star. It helps others find the project.
 [![Issues](https://img.shields.io/github/issues/Orellius/cortex-terminal)](https://github.com/Orellius/cortex-terminal/issues)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
+<a href="https://www.producthunt.com/products/cortex-terminal?utm_source=badge-featured&utm_medium=badge" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=cortex-terminal&theme=dark" alt="Cortex Terminal on Product Hunt" width="250" height="54" /></a>
+
 ## Attribution
 
 Cortex Terminal is created by [Orellius Labs](https://orellius.ai).
