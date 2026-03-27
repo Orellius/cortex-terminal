@@ -1,10 +1,20 @@
 export type TabKind = "ai" | "shell";
+export type SplitDirection = "vertical" | "horizontal";
+
+export interface Pane {
+  id: string;
+  kind: TabKind;
+  cwd: string;
+}
 
 export interface Tab {
   id: string;
   title: string;
   cwd: string;
   kind: TabKind;
+  panes: Pane[];
+  activePaneId: string;
+  splitDirection: SplitDirection | null;
 }
 
 export interface PtyOutputPayload {

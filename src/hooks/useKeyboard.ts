@@ -14,6 +14,8 @@ interface KeyboardCallbacks {
   closeTab: () => void;
   switchTabByIndex: (index: number) => void;
   toggleSettings: () => void;
+  splitVertical: () => void;
+  splitHorizontal: () => void;
 }
 
 export function useKeyboard({
@@ -28,10 +30,23 @@ export function useKeyboard({
   closeTab,
   switchTabByIndex,
   toggleSettings,
+  splitVertical,
+  splitHorizontal,
 }: KeyboardCallbacks): void {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!e.metaKey) return;
+
+      // Cmd+D = split vertical, Cmd+Shift+D = split horizontal
+      if (e.key === "d" || e.key === "D") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          splitHorizontal();
+        } else {
+          splitVertical();
+        }
+        return;
+      }
 
       if (e.key === ",") {
         e.preventDefault();
@@ -89,5 +104,7 @@ export function useKeyboard({
     closeTab,
     switchTabByIndex,
     toggleSettings,
+    splitVertical,
+    splitHorizontal,
   ]);
 }

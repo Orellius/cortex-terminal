@@ -7,8 +7,7 @@ import { useStatusPoll } from "./hooks/useStatusPoll";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { TitleBar } from "./components/TitleBar";
 import { TabBar } from "./components/TabBar";
-import { TabTerminal } from "./components/TabTerminal";
-import { AiTabTerminal } from "./components/AiTabTerminal";
+import { SplitPaneLayout } from "./components/SplitPaneLayout";
 import { StatusBar } from "./components/StatusBar";
 import { ProjectLauncher } from "./components/ProjectLauncher";
 import { SettingsOverlay } from "./components/settings/SettingsOverlay";
@@ -26,6 +25,9 @@ export function App(): JSX.Element {
     closeTab,
     switchTab,
     updateTabCwd,
+    splitPane,
+    closePaneInTab,
+    setActivePaneInTab,
   } = useTabs(homeDir);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
@@ -148,6 +150,8 @@ export function App(): JSX.Element {
     closeTab: closeActiveTab,
     switchTabByIndex,
     toggleSettings,
+    splitVertical: () => splitPane("vertical"),
+    splitHorizontal: () => splitPane("horizontal"),
   });
 
   const { branch, usage } = useStatusPoll(activeTab?.cwd ?? "");
@@ -156,12 +160,7 @@ export function App(): JSX.Element {
     ? (activeTab?.cwd ?? "").replace(homeDir, "~")
     : activeTab?.cwd || "~";
 
-  const handleCloseSearch = useCallback(() => {
-    setShowSearch(false);
-    searchRefProxy.current?.clearDecorations();
-    terminalRefProxy.current?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  void showSearch; // used later when search is wired into split panes
 
   return (
     <div
@@ -194,24 +193,28 @@ export function App(): JSX.Element {
           position: "relative",
         }}
       >
-        {tabs.map((tab) =>
-          tab.kind === "ai" ? (
-            <AiTabTerminal
-              key={tab.id}
-              tab={tab}
-              isActive={tab.id === activeTabId}
-            />
-          ) : (
-            <TabTerminal
-              key={tab.id}
-              tab={tab}
-              isActive={tab.id === activeTabId}
+        {tabs.map((tab) => (
+          <div
+            key={tab.id}
+            style={{
+              display: tab.id === activeTabId ? "flex" : "none",
+              flex: 1,
+              minHeight: 0,
+              flexDirection: "column",
+            }}
+          >
+            <SplitPaneLayout
+              panes={tab.panes}
+              activePaneId={tab.activePaneId}
+              splitDirection={tab.splitDirection}
+              tabId={tab.id}
+              isTabActive={tab.id === activeTabId}
+              onActivatePane={(paneId) => setActivePaneInTab(tab.id, paneId)}
+              onClosePane={(paneId) => closePaneInTab(tab.id, paneId)}
               setCwd={(cwd) => updateTabCwd(tab.id, cwd)}
-              showSearch={showSearch}
-              onCloseSearch={handleCloseSearch}
             />
-          )
-        )}
+          </div>
+        ))}
       </div>
 
       <StatusBar
