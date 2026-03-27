@@ -198,15 +198,15 @@ export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
         background: "#09090b",
       }}
     >
-      {/* Watermark */}
+      {/* Watermark — centered vertically, slightly above center so skull sits above input */}
       <div
         style={{
           position: "absolute",
-          top: "5%",
+          top: "50%",
           left: "50%",
-          transform: "translateX(-50%)",
-          width: "65%",
-          maxWidth: "40rem",
+          transform: "translate(-50%, -58%)",
+          width: "50%",
+          maxWidth: "28rem",
           opacity: 0.035,
           pointerEvents: "none",
           zIndex: 0,
@@ -215,7 +215,7 @@ export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
         <img
           src={watermark}
           alt=""
-          style={{ width: "100%", objectFit: "contain", objectPosition: "top center" }}
+          style={{ width: "100%", objectFit: "contain" }}
         />
       </div>
 
