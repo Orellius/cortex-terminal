@@ -32,6 +32,7 @@ export function TabBar({
 
   return (
     <div
+      data-tauri-drag-region=""
       style={{
         height: TAB_BAR_HEIGHT,
         minHeight: TAB_BAR_HEIGHT,
@@ -156,6 +157,12 @@ export function TabBar({
       >
         +
       </button>
+
+      {/* Draggable spacer — fills remaining tab bar width */}
+      <div
+        data-tauri-drag-region=""
+        style={{ flex: 1, minWidth: "2rem" }}
+      />
     </div>
   );
 }
