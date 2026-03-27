@@ -190,7 +190,7 @@ export function AiChatInput({ onSubmit, disabled }: AiChatInputProps): JSX.Eleme
             padding: "0 0.625rem 0.375rem",
             fontFamily: '"Geist Mono", Menlo, monospace',
             fontSize: "0.5rem",
-            color: "#1c1c1e",
+            color: "rgba(255, 255, 255, 0.2)",
           }}
         >
           <span>
