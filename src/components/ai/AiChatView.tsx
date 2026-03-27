@@ -202,12 +202,12 @@ export function AiChatView({ paneId, isActive }: AiChatViewProps): JSX.Element {
       <div
         style={{
           position: "absolute",
-          top: "40%",
+          top: "0",
           left: "50%",
-          transform: "translate(-50%, -55%)",
+          transform: "translateX(-50%)",
           width: "60%",
           maxWidth: "36rem",
-          opacity: 0.035,
+          opacity: 0.02,
           pointerEvents: "none",
           zIndex: 0,
         }}
