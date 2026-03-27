@@ -34,6 +34,22 @@ pub fn run() {
     let config_state = Arc::new(Mutex::new(cortex_config));
 
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        if let Some(window) = app.get_webview_window("main") {
+                            if window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                            } else {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -42,6 +58,10 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // Register global hotkey: Ctrl+` (quake-style toggle)
+            use tauri_plugin_global_shortcut::GlobalShortcutExt;
+            let _ = app.global_shortcut().register("ctrl+`");
 
             // Initialize SQLite database in app data dir
             let data_dir = app

@@ -13,6 +13,7 @@
     {
       "identifier": "core:event:allow-listen",
       "allow": [{ "event": "pty:*" }, { "event": "session:*" }, { "event": "cortex:*" }]
-    }
+    },
+    "global-shortcut:default"
   ]
 }
