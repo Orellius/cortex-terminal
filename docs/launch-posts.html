@@ -88,26 +88,37 @@ orellius.ai</span></div>
 <h2>Reddit - r/programming</h2>
 <!-- ═══════════════════════════════════════════ -->
 
-<h3>Title</h3>
-<div class="post"><button class="copy-btn" onclick="copyPost('reddit-title')">Copy</button><span id="reddit-title">I got tired of having 6 AI tool tabs open so I built a terminal that routes between 26 LLM providers - open source</span></div>
+<h3>Title (link post to a Dev.to/Hashnode technical article)</h3>
+<div class="post"><button class="copy-btn" onclick="copyPost('reddit-title')">Copy</button><span id="reddit-title">Building a unified streaming client for 26 LLM providers: why almost everyone copies OpenAI's SSE format and what that means for tooling</span></div>
 
-<h3>Body</h3>
-<div class="post"><button class="copy-btn" onclick="copyPost('reddit-body')">Copy</button><span id="reddit-body">I've been juggling Claude, GPT, Gemini, and local Ollama models for the past year. Each in a different tab, different context, different conversation. Context-switching was costing me more time than the AI was saving.
+<h3>Body (technical write-up, not project demo)</h3>
+<div class="post"><button class="copy-btn" onclick="copyPost('reddit-body')">Copy</button><span id="reddit-body">I spent the last few months building a multi-model terminal in Rust and ran into an interesting pattern worth sharing.
 
-So I built Cortex Terminal: a native desktop terminal (Tauri 2.0 + Rust backend) that connects to 26 LLM providers through a unified interface. You type in one input. Smart routing picks the best model based on what you wrote. Or you force a provider with a prefix (c: for Claude, l: for local).
+When you look at the API surface of 26 different LLM providers (OpenAI, Anthropic, Gemini, Mistral, DeepSeek, Groq, xAI, Together AI, Cerebras, Cohere, Fireworks, and a dozen more), 17 out of 20 cloud providers use the exact same streaming format: OpenAI-compatible SSE with `data: {json}\n\n` framing and `choices[0].delta.content` for token extraction.
 
-What makes it different:
-- One shared MCP tool layer across ALL 26 providers. Tools you configure work with every model.
-- Streaming token-by-token from every provider (SSE + NDJSON)
-- Context-aware: reads your cwd, git status, project files automatically
-- Budget metering with daily cap and automatic local fallback
-- Real terminal (PTY via portable-pty), not a web wrapper
+This means you can build ONE generic HTTP streaming client and configure it per-provider through a TOML registry instead of writing 26 separate integrations:
 
-Tech: Tauri 2.0, Rust, React 19, xterm.js v6, SQLite, KaTeX for math
+```rust
+// Same client, different base_url + API key
+let body = json!({ "model": model, "messages": msgs, "stream": true });
+let resp = client.post(&amp;provider.endpoint)
+    .header("Authorization", format!("Bearer {key}"))
+    .json(&amp;body).send()?;
+// Read SSE lines, extract choices[0].delta.content
+```
 
-Apache 2.0: github.com/Orellius/cortex-terminal
+The three outliers:
+- Anthropic uses SSE but with `content_block_delta` events instead of `choices[0].delta`
+- Ollama uses NDJSON (newline-delimited JSON) with `message.content`
+- Amazon Bedrock uses AWS SigV4 signing instead of Bearer tokens
 
-If you use multiple AI models in your workflow, I'd like to know what you think. Stars help with visibility.</span></div>
+The harder problem was MCP (Model Context Protocol) bridging. MCP servers communicate via JSON-RPC over stdio with LSP-style `Content-Length` headers. The challenge: making ONE tool definition work across all 26 providers. The tool descriptions get injected into the system prompt, and each provider has slightly different ideas about what a "system prompt" is (OpenAI uses `role: system`, Anthropic has a top-level `system` field, Gemini uses `systemInstruction`, DeepSeek R1 ignores system prompts entirely).
+
+The threading model was another non-obvious decision. Terminal emulation (PTY) needs a dedicated reader thread per pane. AI streaming needs to not block the PTY or the IPC thread. Solution: each PTY pane gets a `std::thread`, AI calls run in `tokio::spawn_blocking`, and the Tauri event system bridges everything to the React frontend without either side knowing about the other.
+
+The codebase is open source (Apache 2.0) if anyone wants to look at the provider registry pattern or the MCP bridge implementation: github.com/Orellius/cortex-terminal
+
+Curious if anyone else has built multi-provider LLM tooling and ran into the same convergence toward the OpenAI format.</span></div>
 
 <!-- ═══════════════════════════════════════════ -->
 <h2>Reddit - r/rust</h2>
