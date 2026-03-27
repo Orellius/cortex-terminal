@@ -17,9 +17,13 @@ pub(crate) fn verify(output: &str, query: &str) -> VerifyResult {
         return VerifyResult { passed: false, score: 0, flags: vec!["empty".into()] };
     }
 
-    if trimmed.len() < 15 {
+    // Only flag short responses when the query isn't asking for something brief
+    let query_lower_v = query.to_lowercase();
+    let wants_short = ["short", "brief", "quick", "number", "name", "yes or no", "true or false", "how many", "what is the"]
+        .iter().any(|k| query_lower_v.contains(k));
+    if trimmed.len() < 10 && !wants_short {
         flags.push("too_short".into());
-        score = score.saturating_sub(40);
+        score = score.saturating_sub(30);
     }
 
     // Garbage detection
@@ -57,15 +61,16 @@ pub(crate) fn verify(output: &str, query: &str) -> VerifyResult {
     }
 
     // Relevance — query keywords should appear in output
+    // Relevance — only flag if response is long AND has zero keyword overlap
     let query_lower = query.to_lowercase();
     let keywords: Vec<&str> = query_lower.split_whitespace()
-        .filter(|w| w.len() > 3)
+        .filter(|w| w.len() > 4) // only check substantial words
         .collect();
-    if !keywords.is_empty() {
+    if keywords.len() >= 3 && trimmed.len() > 50 {
         let found = keywords.iter().filter(|w| lower.contains(**w)).count();
         if found == 0 {
             flags.push("off_topic".into());
-            score = score.saturating_sub(25);
+            score = score.saturating_sub(20);
         }
     }
 
