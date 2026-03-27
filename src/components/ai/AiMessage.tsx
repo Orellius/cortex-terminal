@@ -1,4 +1,5 @@
 import { type JSX } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 export interface ChatMessage {
   id: string;
@@ -132,15 +133,30 @@ function AssistantMessage({ message, onOpenFile, onOpenContent }: {
         }}
         onClick={(e) => {
           const target = e.target as HTMLElement;
+
+          // .md file reference → open in sidebar
           const filePath = target.getAttribute("data-file-path");
           if (filePath && onOpenFile) {
             e.preventDefault();
             onOpenFile(filePath);
+            return;
           }
+
+          // Markdown code block → open in sidebar
           const mdContent = target.getAttribute("data-md-content");
           if (mdContent && onOpenContent) {
             e.preventDefault();
             onOpenContent(decodeURIComponent(mdContent));
+            return;
+          }
+
+          // URL links → open in system browser via Tauri
+          if (target.tagName === "A") {
+            e.preventDefault();
+            const href = target.getAttribute("href");
+            if (href) {
+              invoke("open_external", { target: href }).catch(() => {});
+            }
           }
         }}
         // eslint-disable-next-line react/no-danger

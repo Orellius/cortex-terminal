@@ -179,6 +179,16 @@ pub(crate) fn get_claude_usage() -> Result<ClaudeUsage, String> {
 }
 
 // ---------------------------------------------------------------------------
+// Open URLs/files with system handler
+// ---------------------------------------------------------------------------
+
+/// Open a URL in the default browser or a file in the default app.
+#[tauri::command]
+pub(crate) async fn open_external(target: String) -> Result<(), String> {
+    open::that(&target).map_err(|e| format!("failed to open: {e}"))
+}
+
+// ---------------------------------------------------------------------------
 // File reading (for markdown sidebar)
 // ---------------------------------------------------------------------------
 
