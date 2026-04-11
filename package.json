@@ -10,7 +10,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "packageManager": "pnpm@10.30.3",
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.2",
